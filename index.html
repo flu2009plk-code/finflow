@@ -1,0 +1,3002 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FinFlow</title>
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS PWA Support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FinFlow">
+<link rel="apple-touch-icon" href="icons/icon-apple-touch.png">
+
+<!-- Theme color (iOS Safari top bar) -->
+<meta name="theme-color" content="#4F46E5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1117"  media="(prefers-color-scheme: dark)">
+
+<!-- Splash screen colors -->
+<meta name="msapplication-TileColor" content="#4F46E5">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+
+<style>
+/* Layout: single-column app shell, sticky topbar, scrollable body, fixed FAB, bottom-sheet popups */
+:root {
+  --bg:        #EEF2F7;
+  --surface:   #FFFFFF;
+  --surface2:  #F5F7FA;
+  --border:    #E1E8F0;
+  --fg:        #111827;
+  --fg2:       #374151;
+  --fg-muted:  #9CA3AF;
+  --accent:    #4F46E5;
+  --accent-s:  #EEF2FF;
+  --income:    #059669;
+  --income-s:  #D1FAE5;
+  --expense:   #DC2626;
+  --expense-s: #FEE2E2;
+  --cash-c:    #B45309;
+  --cash-s:    #FEF3C7;
+  --bank-c:    #1D4ED8;
+  --bank-s:    #DBEAFE;
+  --ew-c:      #6D28D9;
+  --ew-s:      #EDE9FE;
+  --sh:        0 1px 3px rgba(0,0,0,.07),0 2px 8px rgba(0,0,0,.05);
+  --sh-lg:     0 8px 32px rgba(0,0,0,.13);
+  --rad:       14px;
+  --rad-s:     9px;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1117; --surface:#161B22; --surface2:#0D1117;
+    --border:#21262D; --fg:#E6EDF3; --fg2:#8B949E; --fg-muted:#484F58;
+    --accent:#818CF8; --accent-s:#1E1B4B;
+    --income:#34D399; --income-s:#022C22;
+    --expense:#F87171; --expense-s:#450A0A;
+    --cash-c:#FCD34D; --cash-s:#1C1204;
+    --bank-c:#60A5FA; --bank-s:#0C1A3A;
+    --ew-c:#A78BFA; --ew-s:#1C1040;
+    --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
+    --sh-lg:0 8px 32px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1117; --surface:#161B22; --surface2:#0D1117;
+  --border:#21262D; --fg:#E6EDF3; --fg2:#8B949E; --fg-muted:#484F58;
+  --accent:#818CF8; --accent-s:#1E1B4B;
+  --income:#34D399; --income-s:#022C22;
+  --expense:#F87171; --expense-s:#450A0A;
+  --cash-c:#FCD34D; --cash-s:#1C1204;
+  --bank-c:#60A5FA; --bank-s:#0C1A3A;
+  --ew-c:#A78BFA; --ew-s:#1C1040;
+  --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
+  --sh-lg:0 8px 32px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;}
+body{
+  min-height:100%;font-family:'Sarabun',system-ui,sans-serif;font-size:15px;
+  line-height:1.5;background:var(--bg);color:var(--fg);
+  -webkit-font-smoothing:antialiased;
+}
+#app{max-width:480px;margin:0 auto;position:relative;min-height:100vh;}
+
+/* ── Top bar ─────────────────────────────────────── */
+.topbar{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:30;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;gap:8px;
+}
+.app-name{font-size:17px;font-weight:700;letter-spacing:-.4px;color:var(--accent);}
+.month-nav{display:flex;align-items:center;gap:2px;}
+.mnav-btn{
+  background:none;border:none;cursor:pointer;color:var(--fg-muted);
+  padding:4px 7px;font-size:15px;border-radius:6px;line-height:1;
+  transition:background .12s;
+}
+.mnav-btn:hover{background:var(--border);}
+.month-lbl{font-size:13px;font-weight:600;color:var(--fg2);min-width:110px;text-align:center;}
+.theme-btn{
+  background:none;border:1px solid var(--border);cursor:pointer;
+  color:var(--fg-muted);padding:5px 9px;font-size:13px;
+  border-radius:var(--rad-s);transition:background .12s;
+  white-space:nowrap;
+}
+.theme-btn:hover{background:var(--border);}
+
+/* ── Export overlay ──────────────────────────────── */
+.export-fmt-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
+.export-fmt-card{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:16px 10px;border:2px solid var(--border);border-radius:var(--rad);
+  cursor:pointer;background:var(--surface2);transition:all .15s;
+}
+.export-fmt-card:hover{border-color:var(--accent);background:var(--accent-s);}
+.export-fmt-icon{font-size:28px;}
+.export-fmt-name{font-size:14px;font-weight:700;color:var(--fg);}
+.export-fmt-sub{font-size:11px;color:var(--fg-muted);text-align:center;}
+.export-scope-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.export-scope-btn{
+  padding:7px 13px;border:1.5px solid var(--border);border-radius:20px;
+  background:none;font-family:inherit;font-size:13px;font-weight:600;
+  color:var(--fg-muted);cursor:pointer;transition:all .12s;
+}
+.export-scope-btn.active{border-color:var(--accent);background:var(--accent-s);color:var(--accent);}
+.export-date-range{display:flex;gap:8px;margin-bottom:14px;}
+.export-date-range input{
+  flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+  background:var(--surface2);font-family:inherit;font-size:13px;color:var(--fg);
+}
+.export-preview-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border-radius:var(--rad-s);padding:10px 14px;
+  margin-bottom:14px;font-size:13px;
+}
+.export-preview-count{font-weight:700;color:var(--accent);}
+.export-cols-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;}
+.export-col-chip{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 11px;border:1.5px solid var(--border);border-radius:20px;
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;
+  background:var(--surface2);color:var(--fg-muted);user-select:none;
+}
+.export-col-chip.on{border-color:var(--accent);background:var(--accent-s);color:var(--accent);}
+.export-col-chip-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0;}
+
+/* ── Scroll body ─────────────────────────────────── */
+.scroll-body{padding:0 14px;padding-bottom:96px;}
+
+/* ── Balance card ────────────────────────────────── */
+.balance-card{
+  background:var(--accent);border-radius:var(--rad);
+  padding:22px 20px 18px;margin:14px 0;color:#fff;
+}
+.bc-label{
+  font-size:11px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;opacity:.7;margin-bottom:3px;
+}
+.bc-amount{
+  font-size:34px;font-weight:700;letter-spacing:-.5px;
+  font-variant-numeric:tabular-nums;line-height:1.1;margin-bottom:16px;
+  font-family:'IBM Plex Mono','Sarabun',monospace;
+}
+.bc-row{
+  display:flex;background:rgba(255,255,255,.15);
+  border-radius:var(--rad-s);overflow:hidden;
+}
+.bc-stat{flex:1;padding:9px 14px;}
+.bc-stat+.bc-stat{border-left:1px solid rgba(255,255,255,.2);}
+.bc-stat-lbl{font-size:10px;font-weight:600;opacity:.65;letter-spacing:.07em;text-transform:uppercase;}
+.bc-stat-val{
+  font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;
+  font-family:'IBM Plex Mono','Sarabun',monospace;
+}
+
+/* ── Section ─────────────────────────────────────── */
+.section{margin-bottom:22px;}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.sec-title{font-size:14px;font-weight:700;letter-spacing:.01em;color:var(--fg);}
+.text-btn{background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px;color:var(--accent);padding:0;}
+
+/* ── Wallet grid ─────────────────────────────────── */
+.wallet-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.wcard{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad);padding:13px 11px;cursor:pointer;
+  box-shadow:var(--sh);transition:transform .15s,box-shadow .15s;
+}
+.wcard:hover{transform:translateY(-2px);box-shadow:var(--sh-lg);}
+.wcard:active{transform:translateY(0);}
+.wcard-icon{
+  width:34px;height:34px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;margin-bottom:8px;
+}
+.wcard-name{font-size:11px;font-weight:500;color:var(--fg-muted);margin-bottom:3px;}
+.wcard-bal{
+  font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-family:'IBM Plex Mono','Sarabun',monospace;
+}
+
+/* ── Chart ───────────────────────────────────────── */
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad);padding:16px;box-shadow:var(--sh);
+}
+.chart-legend{display:flex;gap:14px;margin-bottom:10px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--fg-muted);}
+.leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+#chart-svg{width:100%;display:block;overflow:visible;}
+
+/* ── Transaction list ────────────────────────────── */
+.tx-list{display:flex;flex-direction:column;gap:6px;}
+.txcard{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad);padding:12px 13px;
+  display:flex;align-items:center;gap:11px;
+  cursor:pointer;box-shadow:var(--sh);transition:background .1s;
+}
+.txcard:hover{background:var(--surface2);}
+.tx-ico{
+  width:40px;height:40px;flex-shrink:0;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.tx-info{flex:1;min-width:0;}
+.tx-cat{font-size:14px;font-weight:600;color:var(--fg);margin-bottom:1px;}
+.tx-meta{font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.wbadge{
+  font-size:10px;font-weight:700;padding:1px 6px;
+  border-radius:4px;letter-spacing:.03em;
+}
+.method-badge{font-size:10px;opacity:.7;}
+.tx-right{text-align:right;flex-shrink:0;}
+.tx-amt{
+  font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;
+  font-family:'IBM Plex Mono','Sarabun',monospace;
+}
+.tx-amt.inc{color:var(--income);}
+.tx-amt.exp{color:var(--expense);}
+.tx-date-sm{font-size:11px;color:var(--fg-muted);margin-top:1px;}
+
+/* ── FAB ─────────────────────────────────────────── */
+.fab{
+  position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));
+  right:max(16px, calc((100vw - 480px)/2 + 16px));
+  width:54px;height:54px;background:var(--accent);color:#fff;
+  border:none;border-radius:16px;font-size:28px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:50;
+  box-shadow:0 4px 18px rgba(79,70,229,.4);
+  transition:transform .15s,box-shadow .15s;
+}
+.fab:hover{transform:scale(1.06);box-shadow:0 6px 24px rgba(79,70,229,.5);}
+.fab:active{transform:scale(.94);}
+
+/* ── Overlay / Sheet ─────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:200;
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.overlay.open{opacity:1;pointer-events:all;}
+.sheet{
+  background:var(--surface);border-radius:20px 20px 0 0;
+  width:100%;max-width:480px;max-height:92vh;
+  overflow-y:auto;
+  transform:translateY(100%);
+  transition:transform .25s cubic-bezier(.32,1,.5,1);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.overlay.open .sheet{transform:translateY(0);}
+.drag-pill{
+  width:38px;height:4px;background:var(--border);
+  border-radius:2px;margin:10px auto 0;
+}
+.sheet-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 12px;border-bottom:1px solid var(--border);
+}
+.sheet-title{font-size:15px;font-weight:700;}
+.close-btn{
+  background:var(--surface2);border:none;cursor:pointer;
+  width:27px;height:27px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--fg-muted);
+}
+.close-btn:hover{background:var(--border);}
+.sheet-body{padding:14px 16px 20px;}
+
+/* ── Tabs ─────────────────────────────────────────── */
+.tabs{
+  display:flex;background:var(--surface2);
+  border-radius:var(--rad-s);padding:3px;gap:2px;margin-bottom:16px;
+}
+.tab-btn{
+  flex:1;padding:7px;border:none;cursor:pointer;
+  border-radius:6px;font-family:inherit;font-size:13px;font-weight:500;
+  background:none;color:var(--fg-muted);transition:background .12s,color .12s;
+}
+.tab-btn.active{background:var(--surface);color:var(--fg);box-shadow:var(--sh);}
+
+/* ── Type toggle ─────────────────────────────────── */
+.type-toggle{
+  display:flex;border:1px solid var(--border);
+  border-radius:var(--rad-s);overflow:hidden;margin-bottom:18px;
+}
+.type-btn{
+  flex:1;padding:10px;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;
+  background:var(--surface);color:var(--fg-muted);transition:background .12s,color .12s;
+}
+.type-btn.active.inc-btn{background:var(--income-s);color:var(--income);}
+.type-btn.active.exp-btn{background:var(--expense-s);color:var(--expense);}
+
+/* ── Form elements ───────────────────────────────── */
+.field-lbl{
+  font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--fg-muted);margin-bottom:6px;
+}
+.amount-wrap{position:relative;margin-bottom:16px;}
+.baht-sym{
+  position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  font-size:20px;font-weight:700;color:var(--fg-muted);
+  font-family:'IBM Plex Mono',monospace;
+}
+.amount-input{
+  width:100%;padding:12px 12px 12px 32px;
+  font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;
+  border:1px solid var(--border);border-radius:var(--rad-s);
+  background:var(--surface2);color:var(--fg);outline:none;
+}
+.amount-input:focus{border-color:var(--accent);}
+.cat-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.cat-chip{
+  padding:6px 11px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface2);
+  cursor:pointer;font-size:12px;font-family:inherit;
+  color:var(--fg2);transition:all .1s;
+}
+.cat-chip.sel{background:var(--accent-s);border-color:var(--accent);color:var(--accent);}
+.wallet-opts{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.wopt{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--rad-s);cursor:pointer;background:var(--surface2);
+  transition:all .1s;
+}
+.wopt.sel{border-color:var(--accent);background:var(--accent-s);}
+.wopt-name{font-size:13px;font-weight:600;flex:1;}
+.wopt-bal{font-size:11px;color:var(--fg-muted);font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+.text-input{
+  width:100%;padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--rad-s);font-family:inherit;font-size:14px;
+  background:var(--surface2);color:var(--fg);outline:none;margin-bottom:12px;
+}
+.text-input:focus{border-color:var(--accent);}
+.submit-btn{
+  width:100%;padding:13px;background:var(--accent);color:#fff;
+  border:none;border-radius:var(--rad);font-family:inherit;
+  font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;
+  transition:opacity .12s;
+}
+.submit-btn:hover{opacity:.9;}
+
+/* ── Voice UI ────────────────────────────────────── */
+.voice-panel{padding:4px 0 8px;}
+
+.mic-zone{
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 0 16px;gap:12px;
+}
+
+.mic-btn{
+  position:relative;width:80px;height:80px;border-radius:50%;
+  border:none;cursor:pointer;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;box-shadow:0 4px 20px rgba(79,70,229,.35);
+  transition:transform .15s,box-shadow .15s;
+  flex-shrink:0;
+}
+.mic-btn:hover{transform:scale(1.06);}
+.mic-btn:active{transform:scale(.93);}
+.mic-btn.listening{background:var(--expense);box-shadow:0 4px 20px rgba(220,38,38,.4);animation:micPulse 1.2s ease-in-out infinite;}
+.mic-btn.unsupported{background:var(--fg-muted);cursor:not-allowed;opacity:.6;}
+
+@keyframes micPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4);}
+  50%{box-shadow:0 0 0 16px rgba(220,38,38,0);}
+}
+
+.mic-rings{
+  position:absolute;inset:-12px;border-radius:50%;
+  border:2px solid rgba(220,38,38,.3);
+  opacity:0;
+}
+.mic-btn.listening .mic-rings{animation:ringExpand 1.2s ease-out infinite;}
+@keyframes ringExpand{
+  0%{transform:scale(.9);opacity:.7;}
+  100%{transform:scale(1.3);opacity:0;}
+}
+
+.mic-status{font-size:13px;font-weight:600;color:var(--fg-muted);text-align:center;}
+.mic-status.active{color:var(--expense);}
+
+/* Voice transcript bubble */
+.transcript-box{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--rad);padding:13px 14px;
+  min-height:52px;font-size:15px;color:var(--fg);
+  font-style:italic;text-align:center;
+  transition:border-color .2s;margin-bottom:14px;
+}
+.transcript-box.has-text{font-style:normal;text-align:left;border-color:var(--accent);}
+
+/* OR divider */
+.or-divider{
+  display:flex;align-items:center;gap:10px;
+  color:var(--fg-muted);font-size:12px;font-weight:600;
+  letter-spacing:.06em;margin:2px 0 14px;
+}
+.or-divider::before,.or-divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* Text command input */
+.cmd-wrap{position:relative;margin-bottom:16px;}
+.cmd-input{
+  width:100%;padding:11px 44px 11px 14px;
+  border:1px solid var(--border);border-radius:var(--rad-s);
+  font-family:inherit;font-size:14px;background:var(--surface2);color:var(--fg);
+  outline:none;
+}
+.cmd-input:focus{border-color:var(--accent);}
+.cmd-parse-btn{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:var(--accent);border:none;cursor:pointer;
+  color:#fff;border-radius:6px;padding:4px 9px;font-size:12px;
+  font-weight:700;font-family:inherit;
+}
+
+/* Example chips */
+.example-label{font-size:11px;color:var(--fg-muted);margin-bottom:6px;}
+.ex-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;}
+.ex-chip{
+  padding:5px 10px;border-radius:20px;border:1px dashed var(--border);
+  background:var(--surface2);font-size:11px;color:var(--fg2);
+  cursor:pointer;transition:background .1s;font-family:inherit;
+}
+.ex-chip:hover{background:var(--accent-s);border-color:var(--accent);color:var(--accent);}
+
+/* Parse result card */
+.parse-result{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--rad);overflow:hidden;margin-bottom:14px;
+  transition:border-color .2s;
+}
+.parse-result.valid{border-color:var(--income);}
+.parse-result.invalid{border-color:var(--expense);}
+.pr-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 13px;border-bottom:1px solid var(--border);
+  font-size:12px;font-weight:700;
+}
+.pr-rows{padding:8px 0;}
+.pr-row{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 13px;font-size:13px;
+}
+.pr-key{color:var(--fg-muted);min-width:70px;font-size:12px;}
+.pr-val{font-weight:600;color:var(--fg);}
+.pr-val.inc{color:var(--income);}
+.pr-val.exp{color:var(--expense);}
+.pr-confidence{
+  display:flex;gap:2px;align-items:center;font-size:10px;
+  color:var(--fg-muted);
+}
+.conf-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--border);
+}
+.conf-dot.on{background:var(--income);}
+
+.parse-empty{
+  padding:20px;text-align:center;
+  color:var(--fg-muted);font-size:13px;
+}
+
+/* ── Slip OCR panel ─────────────────────────────── */
+.slip-panel{padding:2px 0 8px;}
+
+/* Upload zone */
+.slip-upload-zone{
+  border:2px dashed var(--border);border-radius:var(--rad);
+  background:var(--surface2);cursor:pointer;
+  transition:border-color .15s,background .15s;
+  overflow:hidden;
+}
+.slip-upload-zone:hover{border-color:var(--accent);background:var(--accent-s);}
+.slip-upload-label{
+  display:flex;flex-direction:column;align-items:center;
+  gap:8px;padding:28px 20px;cursor:pointer;width:100%;
+}
+.slip-upload-icon{font-size:36px;}
+.slip-upload-text{font-size:14px;font-weight:600;color:var(--fg2);}
+.slip-upload-hint{font-size:11px;color:var(--fg-muted);}
+.slip-upload-btns{
+  display:flex;gap:8px;padding:12px 14px;
+  border-top:1px solid var(--border);
+}
+.slip-btn-cam,.slip-btn-gal{
+  flex:1;padding:9px;border:1px solid var(--border);
+  border-radius:var(--rad-s);background:var(--surface);
+  font-family:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;color:var(--fg2);transition:background .12s;
+}
+.slip-btn-cam:hover,.slip-btn-gal:hover{background:var(--border);}
+
+/* Image preview */
+.slip-preview-wrap{position:relative;margin-bottom:12px;}
+.slip-preview-img{
+  width:100%;max-height:280px;object-fit:contain;
+  border-radius:var(--rad);border:1px solid var(--border);
+  background:var(--surface2);display:block;
+}
+.slip-change-btn{
+  position:absolute;top:8px;right:8px;
+  background:rgba(0,0,0,.55);color:#fff;border:none;
+  padding:5px 11px;border-radius:20px;font-size:12px;
+  font-weight:600;cursor:pointer;font-family:inherit;
+  backdrop-filter:blur(4px);
+}
+
+/* Scan button */
+.slip-scan-btn{
+  width:100%;padding:13px;border:none;
+  background:var(--accent);color:#fff;
+  border-radius:var(--rad);font-family:inherit;
+  font-size:15px;font-weight:700;cursor:pointer;
+  margin-bottom:12px;transition:opacity .12s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.slip-scan-btn:hover{opacity:.9;}
+.slip-scan-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* Processing */
+.slip-processing{
+  display:flex;flex-direction:column;align-items:center;
+  gap:12px;padding:24px;
+}
+.slip-spinner{
+  width:40px;height:40px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.slip-proc-text{font-size:13px;color:var(--fg-muted);}
+.slip-proc-steps{font-size:11px;color:var(--fg-muted);margin-top:-4px;}
+
+/* API key settings */
+.slip-settings{
+  border:1px solid var(--border);border-radius:var(--rad-s);
+  overflow:hidden;margin-bottom:12px;
+}
+.slip-settings summary{
+  padding:10px 13px;cursor:pointer;font-size:12px;
+  font-weight:600;color:var(--fg-muted);list-style:none;
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface2);
+}
+.slip-settings summary::-webkit-details-marker{display:none;}
+.slip-settings-body{
+  padding:12px 13px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:8px;
+}
+.slip-settings-note{font-size:12px;color:var(--fg-muted);line-height:1.5;}
+.slip-api-link{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:12px;color:var(--accent);text-decoration:none;
+  font-weight:600;
+}
+.slip-api-link:hover{text-decoration:underline;}
+.slip-key-row{display:flex;gap:6px;}
+.slip-key-row .text-input{margin-bottom:0;flex:1;font-size:13px;}
+.slip-save-key{
+  padding:8px 14px;border:none;border-radius:var(--rad-s);
+  background:var(--accent);color:#fff;font-family:inherit;
+  font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.slip-key-status{
+  font-size:11px;font-weight:600;
+  display:flex;align-items:center;gap:4px;
+}
+.slip-key-status.ok{color:var(--income);}
+.slip-key-status.none{color:var(--fg-muted);}
+
+/* Parsed result */
+.slip-result-card{
+  background:var(--surface2);border:1px solid var(--income);
+  border-radius:var(--rad);overflow:hidden;margin-bottom:12px;
+}
+.slip-result-hdr{
+  background:var(--income-s);padding:10px 14px;
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:700;color:var(--income);
+  border-bottom:1px solid var(--border);
+}
+.slip-result-fields{padding:10px 0;}
+.slip-field{padding:8px 14px;}
+.slip-field-lbl{
+  font-size:10px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--fg-muted);margin-bottom:4px;
+}
+.slip-field input,.slip-field select{
+  width:100%;padding:8px 10px;border:1px solid var(--border);
+  border-radius:var(--rad-s);font-family:inherit;font-size:14px;
+  background:var(--surface);color:var(--fg);outline:none;
+}
+.slip-field input:focus,.slip-field select:focus{border-color:var(--accent);}
+.slip-field-row{display:flex;gap:8px;}
+.slip-field-row .slip-field{flex:1;padding:8px 0 8px 14px;}
+.slip-field-row .slip-field:last-child{padding-right:14px;}
+.slip-type-toggle{display:flex;border:1px solid var(--border);border-radius:var(--rad-s);overflow:hidden;}
+.slip-type-btn{
+  flex:1;padding:8px;border:none;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:600;
+  background:var(--surface);color:var(--fg-muted);transition:background .1s,color .1s;
+}
+.slip-type-btn.active.inc{background:var(--income-s);color:var(--income);}
+.slip-type-btn.active.exp{background:var(--expense-s);color:var(--expense);}
+
+/* OCR raw text */
+.slip-raw-wrap{
+  border-top:1px solid var(--border);padding:10px 14px;
+}
+.slip-raw-toggle{
+  font-size:11px;color:var(--fg-muted);cursor:pointer;
+  background:none;border:none;font-family:inherit;
+  display:flex;align-items:center;gap:4px;
+}
+.slip-raw-text{
+  margin-top:8px;padding:10px;background:var(--bg);
+  border-radius:var(--rad-s);font-size:10px;font-family:monospace;
+  white-space:pre-wrap;word-break:break-all;color:var(--fg-muted);
+  max-height:120px;overflow-y:auto;display:none;
+}
+.slip-raw-text.show{display:block;}
+
+/* Error state */
+.slip-error{
+  background:var(--expense-s);border:1px solid var(--expense);
+  border-radius:var(--rad-s);padding:12px 14px;
+  font-size:13px;color:var(--expense);
+  display:flex;flex-direction:column;gap:6px;margin-bottom:12px;
+}
+.slip-error-title{font-weight:700;}
+.slip-error-hint{font-size:11px;opacity:.8;}
+
+/* ── Wallet management ──────────────────────────── */
+.wm-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.wm-item{
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--rad-s);padding:10px 12px;
+}
+.wm-item-icon{
+  width:42px;height:42px;border-radius:11px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+.wm-item-info{flex:1;min-width:0;}
+.wm-item-name{font-size:14px;font-weight:700;}
+.wm-item-sub{font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:5px;}
+.wm-item-bal{
+  font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;
+  font-family:'IBM Plex Mono',monospace;flex-shrink:0;
+}
+.wm-edit-btn{
+  background:var(--border);border:none;cursor:pointer;
+  width:28px;height:28px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+}
+.wm-add-btn{
+  width:100%;padding:12px;border:2px dashed var(--border);
+  border-radius:var(--rad);background:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;color:var(--accent);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .12s;
+}
+.wm-add-btn:hover{background:var(--accent-s);}
+
+/* Bank / wallet type picker */
+.wtype-tabs{
+  display:flex;background:var(--surface2);
+  border-radius:var(--rad-s);padding:3px;gap:2px;margin-bottom:14px;
+}
+.wtype-tab{
+  flex:1;padding:7px 4px;border:none;cursor:pointer;
+  border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;
+  background:none;color:var(--fg-muted);transition:background .12s,color .12s;text-align:center;
+}
+.wtype-tab.active{background:var(--surface);color:var(--fg);box-shadow:var(--sh);}
+
+.bank-picker{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:14px;
+}
+.bank-chip{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:8px 3px;border-radius:var(--rad-s);
+  border:2px solid var(--border);cursor:pointer;
+  background:var(--surface2);transition:all .12s;
+}
+.bank-chip.sel{border-color:var(--accent);background:var(--accent-s);}
+.bank-chip-badge{
+  width:36px;height:36px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;color:#fff;letter-spacing:-.3px;text-align:center;
+  line-height:1.1;
+}
+.bank-chip-name{font-size:9px;color:var(--fg-muted);text-align:center;line-height:1.2;}
+.bank-chip.sel .bank-chip-name{color:var(--accent);}
+
+.wm-danger-zone{
+  border-top:1px solid var(--border);margin-top:4px;padding-top:14px;
+}
+.wm-delete-btn{
+  width:100%;padding:11px;border:1px solid var(--expense);
+  border-radius:var(--rad-s);background:none;color:var(--expense);
+  font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  transition:background .1s;
+}
+.wm-delete-btn:hover{background:var(--expense-s);}
+.wm-delete-btn:disabled{opacity:.4;cursor:not-allowed;}
+.wm-hint{font-size:11px;color:var(--fg-muted);text-align:center;margin-top:6px;}
+.wm-order-btn{
+  background:var(--surface);border:1px solid var(--border);cursor:pointer;
+  width:26px;height:26px;border-radius:7px;font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--fg-muted);transition:background .1s;flex-shrink:0;
+}
+.wm-order-btn:hover{background:var(--border);}
+.wm-order-btn:disabled{opacity:.3;cursor:not-allowed;}
+.wm-order-btns{display:flex;flex-direction:column;gap:2px;}
+
+/* ── Wallet type summary bar ─────────────────────── */
+.wtype-summary{
+  display:flex;gap:6px;margin-top:10px;
+}
+.wtype-sum-item{
+  flex:1;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad-s);padding:9px 10px;
+  display:flex;flex-direction:column;gap:3px;box-shadow:var(--sh);
+}
+.wtype-sum-label{font-size:9px;font-weight:700;color:var(--fg-muted);letter-spacing:.06em;text-transform:uppercase;}
+.wtype-sum-bal{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+
+/* ── Transfer overlay ────────────────────────────── */
+.transfer-arrow{
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;padding:4px 0;color:var(--accent);
+}
+.transfer-wallet-row{
+  display:flex;flex-direction:column;gap:10px;
+  background:var(--surface2);border-radius:var(--rad);padding:14px;
+  border:1px solid var(--border);
+}
+.transfer-wallet-sel{
+  display:flex;align-items:center;gap:10px;
+}
+.transfer-wallet-sel select{
+  flex:1;padding:8px 10px;border:1.5px solid var(--border);
+  border-radius:var(--rad-s);background:var(--surface);
+  font-family:inherit;font-size:14px;color:var(--fg);
+}
+
+/* ── Detail popup ────────────────────────────────── */
+.detail-top{text-align:center;padding:20px 0 16px;}
+.detail-type-pill{
+  display:inline-block;padding:3px 12px;border-radius:20px;
+  font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;margin-bottom:8px;
+}
+.detail-amount{
+  font-size:40px;font-weight:700;letter-spacing:-.5px;line-height:1;
+  font-variant-numeric:tabular-nums;
+  font-family:'IBM Plex Mono','Sarabun',monospace;
+}
+.detail-rows{border-top:1px solid var(--border);margin-top:4px;}
+.drow{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:11px 0;border-bottom:1px solid var(--border);gap:12px;
+}
+.drow-lbl{font-size:12px;color:var(--fg-muted);flex-shrink:0;}
+.drow-val{font-size:13px;font-weight:600;text-align:right;}
+
+/* ── Utils ───────────────────────────────────────── */
+@media(max-width:380px){
+  .wcard-bal{font-size:12px;}
+  .bc-amount{font-size:28px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .overlay,.sheet,.wcard,.txcard,.fab,.mic-btn{transition:none;animation:none;}
+}
+</style>
+
+<div id="app">
+  <header class="topbar">
+    <span class="app-name">FinFlow</span>
+    <div class="month-nav">
+      <button class="mnav-btn" id="prev-month">&#8249;</button>
+      <span class="month-lbl" id="month-lbl"></span>
+      <button class="mnav-btn" id="next-month">&#8250;</button>
+    </div>
+    <button class="theme-btn" onclick="openExport()" title="ส่งออกข้อมูล" style="padding:5px 8px">📤</button>
+    <button class="theme-btn" id="theme-btn">🌙 Dark</button>
+  </header>
+
+  <div class="scroll-body">
+    <div class="balance-card">
+      <div class="bc-label">ยอดคงเหลือรวม</div>
+      <div class="bc-amount" id="total-balance">฿0.00</div>
+      <div class="bc-row">
+        <div class="bc-stat">
+          <div class="bc-stat-lbl">รายรับเดือนนี้</div>
+          <div class="bc-stat-val" id="month-income">฿0</div>
+        </div>
+        <div class="bc-stat">
+          <div class="bc-stat-lbl">รายจ่ายเดือนนี้</div>
+          <div class="bc-stat-val" id="month-expense">฿0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">กระเป๋าเงิน</span>
+        <div style="display:flex;gap:8px">
+          <button class="text-btn" onclick="openTransfer()" style="font-size:13px">🔄 โอน</button>
+          <button class="text-btn" onclick="openWalletMgmt()" style="font-size:13px">⚙️ จัดการ</button>
+        </div>
+      </div>
+      <div class="wallet-grid" id="wallet-grid"></div>
+      <div class="wtype-summary" id="wtype-summary"></div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr"><span class="sec-title">7 วันล่าสุด</span></div>
+      <div class="chart-card">
+        <div class="chart-legend">
+          <div class="leg-item"><div class="leg-dot" style="background:var(--income)"></div>รายรับ</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--expense)"></div>รายจ่าย</div>
+        </div>
+        <svg id="chart-svg" viewBox="0 0 300 100" aria-label="กราฟ 7 วันล่าสุด"></svg>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">รายการเดือนนี้</span>
+        <span class="sec-title" id="tx-count" style="color:var(--fg-muted);font-weight:400"></span>
+      </div>
+      <div class="tx-list" id="tx-list"></div>
+    </div>
+  </div>
+
+  <button class="fab" id="fab-btn" title="บันทึกรายการ">＋</button>
+</div>
+
+<!-- Transaction detail overlay -->
+<div class="overlay" id="tx-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title">รายละเอียดรายการ</span>
+      <button class="close-btn" data-close="tx-overlay">✕</button>
+    </div>
+    <div class="sheet-body" id="tx-detail-body"></div>
+  </div>
+</div>
+
+<!-- Wallet detail overlay -->
+<div class="overlay" id="wallet-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div id="wallet-detail-content"></div>
+  </div>
+</div>
+
+<!-- Wallet management overlay -->
+<div class="overlay" id="wallet-mgmt-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title">จัดการกระเป๋าเงิน</span>
+      <button class="close-btn" data-close="wallet-mgmt-overlay">✕</button>
+    </div>
+    <div class="sheet-body" id="wallet-mgmt-body"></div>
+  </div>
+</div>
+
+<!-- Wallet add/edit overlay -->
+<div class="overlay" id="wallet-edit-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title" id="wallet-edit-title">เพิ่มกระเป๋าเงิน</span>
+      <button class="close-btn" data-close="wallet-edit-overlay">✕</button>
+    </div>
+    <div class="sheet-body" id="wallet-edit-body"></div>
+  </div>
+</div>
+
+<!-- Export overlay -->
+<div class="overlay" id="export-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title">📤 ส่งออกข้อมูล</span>
+      <button class="close-btn" data-close="export-overlay">✕</button>
+    </div>
+    <div class="sheet-body" id="export-body"></div>
+  </div>
+</div>
+
+<!-- Transfer overlay -->
+<div class="overlay" id="transfer-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title">🔄 โอนเงินระหว่างกระเป๋า</span>
+      <button class="close-btn" data-close="transfer-overlay">✕</button>
+    </div>
+    <div class="sheet-body" id="transfer-body"></div>
+  </div>
+</div>
+
+<!-- Add transaction overlay -->
+<div class="overlay" id="add-overlay">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="drag-pill"></div>
+    <div class="sheet-hdr">
+      <span class="sheet-title">บันทึกรายการใหม่</span>
+      <button class="close-btn" data-close="add-overlay">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="manual" id="tab-manual">✏️ บันทึก</button>
+        <button class="tab-btn" role="tab" data-tab="voice" id="tab-voice">🎙️ พูด</button>
+        <button class="tab-btn" role="tab" data-tab="slip" id="tab-slip">📷 สลิป</button>
+      </div>
+
+      <!-- ── Manual panel ── -->
+      <div id="panel-manual">
+        <div class="type-toggle">
+          <button class="type-btn inc-btn active" id="type-income">+ รายรับ</button>
+          <button class="type-btn exp-btn" id="type-expense">− รายจ่าย</button>
+        </div>
+        <div class="field-lbl">จำนวนเงิน</div>
+        <div class="amount-wrap">
+          <span class="baht-sym">฿</span>
+          <input class="amount-input" type="number" id="inp-amount" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="field-lbl">หมวดหมู่</div>
+        <div class="cat-grid" id="cat-grid"></div>
+        <div class="field-lbl">กระเป๋าเงิน</div>
+        <div class="wallet-opts" id="wallet-opts"></div>
+        <div class="field-lbl">คำอธิบาย</div>
+        <input class="text-input" type="text" id="inp-desc" placeholder="หมายเหตุ (ไม่บังคับ)">
+        <div class="field-lbl">วันที่</div>
+        <input class="text-input" type="date" id="inp-date">
+        <button class="submit-btn" id="submit-btn">บันทึก</button>
+      </div>
+
+      <!-- ── Voice panel ── -->
+      <div id="panel-voice" hidden>
+        <div class="voice-panel">
+          <!-- Mic button -->
+          <div class="mic-zone">
+            <button class="mic-btn" id="mic-btn" title="กดเพื่อพูด">
+              <div class="mic-rings"></div>
+              🎙️
+            </button>
+            <div class="mic-status" id="mic-status">กดเพื่อเริ่มพูด</div>
+          </div>
+
+          <!-- Transcript -->
+          <div class="transcript-box" id="transcript-box">
+            <span style="color:var(--fg-muted)">คำพูดของคุณจะปรากฏที่นี่...</span>
+          </div>
+
+          <div class="or-divider">หรือพิมพ์คำสั่ง</div>
+
+          <!-- Text command fallback -->
+          <div class="cmd-wrap">
+            <input class="cmd-input" id="cmd-input" type="text"
+              placeholder='เช่น "จ่ายค่าอาหาร 150 บาท เงินสด"'>
+            <button class="cmd-parse-btn" id="cmd-parse-btn">วิเคราะห์</button>
+          </div>
+
+          <!-- Examples -->
+          <div class="example-label">ตัวอย่างคำสั่ง:</div>
+          <div class="ex-chips" id="ex-chips"></div>
+
+          <!-- Parse result -->
+          <div class="parse-result" id="parse-result">
+            <div class="parse-empty">พูดหรือพิมพ์คำสั่ง เพื่อดูผลการวิเคราะห์</div>
+          </div>
+
+          <!-- Confirm button -->
+          <button class="submit-btn" id="voice-submit-btn" style="display:none">
+            ✅ บันทึกรายการนี้
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Slip panel ── -->
+      <div id="panel-slip" hidden>
+        <div class="slip-panel">
+
+          <!-- Upload zone -->
+          <div class="slip-upload-zone" id="slip-upload-zone">
+            <label class="slip-upload-label" for="slip-file-hidden">
+              <div class="slip-upload-icon">📷</div>
+              <div class="slip-upload-text">แตะเพื่อถ่ายภาพหรืออัปโหลดสลิป</div>
+              <div class="slip-upload-hint">รองรับ JPG, PNG, HEIC · ลากวางได้</div>
+            </label>
+            <div class="slip-upload-btns">
+              <label class="slip-btn-cam" for="slip-file-cam">📷 ถ่ายภาพ</label>
+              <label class="slip-btn-gal" for="slip-file-hidden">🖼️ เลือกไฟล์</label>
+            </div>
+          </div>
+          <input type="file" accept="image/*" capture="environment" id="slip-file-cam" style="display:none">
+          <input type="file" accept="image/*" id="slip-file-hidden" style="display:none">
+
+          <!-- Preview -->
+          <div class="slip-preview-wrap" id="slip-preview-wrap" hidden>
+            <img id="slip-preview-img" class="slip-preview-img" alt="สลิป">
+            <button class="slip-change-btn" id="slip-change-btn">🔄 เปลี่ยนรูป</button>
+          </div>
+
+          <!-- Scan button -->
+          <button class="slip-scan-btn" id="slip-scan-btn" hidden>
+            🔍 สแกนและวิเคราะห์สลิป
+          </button>
+
+          <!-- Processing -->
+          <div class="slip-processing" id="slip-processing" hidden>
+            <div class="slip-spinner"></div>
+            <div class="slip-proc-text" id="slip-proc-text">กำลังส่งรูปไปวิเคราะห์...</div>
+            <div class="slip-proc-steps" id="slip-proc-steps"></div>
+          </div>
+
+          <!-- Error -->
+          <div class="slip-error" id="slip-error" hidden>
+            <div class="slip-error-title" id="slip-error-title">⚠️ ไม่สามารถสแกนได้</div>
+            <div class="slip-error-hint" id="slip-error-hint"></div>
+          </div>
+
+          <!-- API Key settings -->
+          <details class="slip-settings" id="slip-settings">
+            <summary>⚙️ OCR API Key <span id="slip-key-status-badge" class="slip-key-status none">ยังไม่ตั้งค่า</span></summary>
+            <div class="slip-settings-body">
+              <p class="slip-settings-note">ใช้ <strong>OCR.space</strong> API (ฟรี 25,000 ครั้ง/เดือน) เพื่ออ่านสลิปอัตโนมัติ</p>
+              <a href="https://ocr.space/ocrapi/freekey" target="_blank" rel="noopener" class="slip-api-link">🔑 รับ API Key ฟรี →</a>
+              <div class="slip-key-row">
+                <input class="text-input" type="password" id="slip-api-key" placeholder="K_XXXXXXXXXXXXXXX">
+                <button class="slip-save-key" id="slip-save-key">บันทึก</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- Parsed result -->
+          <div id="slip-result" hidden></div>
+
+          <!-- Save -->
+          <button class="submit-btn" id="slip-submit-btn" hidden>
+            📱 บันทึกรายการจากสลิป
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+const STORE = 'finflow_v1';
+
+const DEFAULT_WALLETS = [
+  { id:'cash',  name:'เงินสด',    type:'cash',    bankCode:'cash',  icon:'💵', balance:5200  },
+  { id:'kbank', name:'กสิกรไทย',  type:'bank',    bankCode:'kbank', icon:'🏦', balance:23450 },
+  { id:'tmw',   name:'TrueMoney', type:'ewallet', bankCode:'tmw',   icon:'📱', balance:1800  },
+];
+
+const SAMPLE_TXN = [
+  {id:1,  date:'2026-10-01', type:'income',  amount:30000, cat:'เงินเดือน',        wallet:'kbank', desc:'เงินเดือนเดือนตุลาคม',   method:'manual'},
+  {id:2,  date:'2026-10-01', type:'expense', amount:450,   cat:'อาหาร',            wallet:'cash',  desc:'ข้าวกลางวัน + ข้าวเย็น', method:'manual'},
+  {id:3,  date:'2026-10-02', type:'expense', amount:85,    cat:'เดินทาง',          wallet:'tmw',   desc:'ค่ารถไฟฟ้า BTS',         method:'slip'},
+  {id:4,  date:'2026-10-02', type:'expense', amount:1200,  cat:'ช้อปปิ้ง',        wallet:'kbank', desc:'เสื้อผ้า Central World',  method:'slip'},
+  {id:5,  date:'2026-10-03', type:'income',  amount:5000,  cat:'รายได้เสริม',     wallet:'kbank', desc:'งาน Freelance',          method:'manual'},
+  {id:6,  date:'2026-10-03', type:'expense', amount:320,   cat:'อาหาร',            wallet:'tmw',   desc:'GrabFood ข้าวมันไก่',    method:'voice'},
+  {id:7,  date:'2026-10-04', type:'expense', amount:2800,  cat:'ค่าสาธารณูปโภค',  wallet:'kbank', desc:'ค่าน้ำ + ค่าไฟ',        method:'manual'},
+  {id:8,  date:'2026-10-05', type:'expense', amount:800,   cat:'สุขภาพ',           wallet:'cash',  desc:'ค่ายาและวิตามิน',        method:'slip'},
+  {id:9,  date:'2026-10-05', type:'expense', amount:350,   cat:'บันเทิง',          wallet:'tmw',   desc:'Netflix + Spotify',      method:'manual'},
+  {id:10, date:'2026-10-06', type:'income',  amount:500,   cat:'เงินโอน',          wallet:'kbank', desc:'เพื่อนคืนเงิน',          method:'voice'},
+  {id:11, date:'2026-10-06', type:'expense', amount:650,   cat:'อาหาร',            wallet:'cash',  desc:'ซุปเปอร์มาร์เก็ต',       method:'voice'},
+  {id:12, date:'2026-10-07', type:'expense', amount:1500,  cat:'การศึกษา',         wallet:'kbank', desc:'คอร์สออนไลน์',           method:'manual'},
+];
+
+const CAT_INCOME  = ['เงินเดือน','โบนัส','รายได้เสริม','เงินโอน','อื่นๆ'];
+const CAT_EXPENSE = ['อาหาร','เดินทาง','ช้อปปิ้ง','ค่าสาธารณูปโภค','สุขภาพ','บันเทิง','การศึกษา','อื่นๆ'];
+
+const CAT_ICON = {
+  'เงินเดือน':'💼','โบนัส':'🎁','รายได้เสริม':'💻','เงินโอน':'💸','อื่นๆ':'➕',
+  'อาหาร':'🍜','เดินทาง':'🚗','ช้อปปิ้ง':'🛍️','ค่าสาธารณูปโภค':'💡',
+  'สุขภาพ':'🏥','บันเทิง':'🎮','การศึกษา':'📚',
+};
+
+const METHOD_LABEL = {manual:'✏️ บันทึก', voice:'🎙️ เสียง', slip:'📷 สลิป', transfer:'🔄 โอน'};
+
+const WALLET_COLORS = {
+  cash:   {c:'var(--cash-c)',  s:'var(--cash-s)'},
+  bank:   {c:'var(--bank-c)', s:'var(--bank-s)'},
+  ewallet:{c:'var(--ew-c)',   s:'var(--ew-s)'},
+};
+
+// Bank-specific colors and metadata
+const BANK_INFO = {
+  kbank:     { abbr:'KBank',  name:'กสิกรไทย',       type:'bank',    icon:'🏦', c:'#1B7F3E', s:'#DCFCE7' },
+  ktb:       { abbr:'KTB',    name:'กรุงไทย',        type:'bank',    icon:'🏦', c:'#1565C0', s:'#DBEAFE' },
+  scb:       { abbr:'SCB',    name:'ไทยพาณิชย์',     type:'bank',    icon:'🏦', c:'#6B21A8', s:'#F3E8FF' },
+  bbl:       { abbr:'BBL',    name:'กรุงเทพ',        type:'bank',    icon:'🏦', c:'#1E3A5F', s:'#DBEAFE' },
+  bay:       { abbr:'BAY',    name:'กรุงศรี',        type:'bank',    icon:'🏦', c:'#B45309', s:'#FEF3C7' },
+  gsb:       { abbr:'ออมสิน', name:'ออมสิน',         type:'bank',    icon:'🏦', c:'#BE185D', s:'#FCE7F3' },
+  ttb:       { abbr:'TTB',    name:'ทีทีบี',         type:'bank',    icon:'🏦', c:'#1E40AF', s:'#EFF6FF' },
+  uob:       { abbr:'UOB',    name:'ยูโอบี',         type:'bank',    icon:'🏦', c:'#7C3AED', s:'#EDE9FE' },
+  cimb:      { abbr:'CIMB',   name:'ซีไอเอ็มบีไทย', type:'bank',    icon:'🏦', c:'#DC2626', s:'#FEE2E2' },
+  tmw:       { abbr:'TRUE',   name:'TrueMoney',      type:'ewallet', icon:'📱', c:'#7C3AED', s:'#EDE9FE' },
+  promptpay: { abbr:'PP',     name:'พร้อมเพย์',      type:'ewallet', icon:'📲', c:'#9B1C1C', s:'#FEE2E2' },
+  rabbit:    { abbr:'Rabbit', name:'LINE Pay',       type:'ewallet', icon:'📱', c:'#047857', s:'#D1FAE5' },
+  shopeepay: { abbr:'Shopee', name:'ShopeePay',      type:'ewallet', icon:'📱', c:'#C2410C', s:'#FFF7ED' },
+  cash:      { abbr:'CASH',   name:'เงินสด',         type:'cash',    icon:'💵', c:'#B45309', s:'#FEF3C7' },
+  other:     { abbr:'OTHER',  name:'อื่นๆ',          type:'bank',    icon:'💳', c:'#6B7280', s:'#F3F4F6' },
+};
+
+const BANK_TYPE_LIST = {
+  cash:    ['cash'],
+  bank:    ['kbank','ktb','scb','bbl','bay','gsb','ttb','uob','cimb','other'],
+  ewallet: ['tmw','promptpay','rabbit','shopeepay'],
+};
+
+const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_DAYS_SHORT = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let store = { wallets: [], txns: [] };
+let viewYear, viewMonth;
+let formType = 'income';
+let formCat = '';
+let formWallet = '';
+let voiceParsed = null;  // last parsed voice result
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function baht(n) {
+  return '฿' + Math.abs(n).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function bahtShort(n) {
+  const a = Math.abs(n);
+  if (a >= 1000000) return (n/1000000).toFixed(1)+'ล.';
+  if (a >= 1000) return (n/1000).toFixed(1)+'K';
+  return a.toFixed(0);
+}
+function walletById(id) { return store.wallets.find(w => w.id === id); }
+function walletColor(w) {
+  const bi = BANK_INFO[w.bankCode];
+  if (bi) return { c: bi.c, s: bi.s };
+  return WALLET_COLORS[w.type] || {c:'var(--fg-muted)',s:'var(--surface2)'};
+}
+function walletBankInfo(w) {
+  return BANK_INFO[w.bankCode] || BANK_INFO[w.type==='bank'?'other':w.type==='ewallet'?'tmw':'cash'];
+}
+function fmtDate(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  return `${d.getDate()} ${TH_MONTHS[d.getMonth()].substring(0,3)} ${d.getFullYear()+543}`;
+}
+function totalBalance() { return store.wallets.reduce((s,w) => s+w.balance, 0); }
+function monthTxns(y, m) {
+  return store.txns.filter(t => {
+    const d = new Date(t.date + 'T00:00:00');
+    return d.getFullYear()===y && d.getMonth()===m;
+  }).sort((a,b) => b.date.localeCompare(a.date)||b.id-a.id);
+}
+function monthSums(y, m) {
+  const txns = monthTxns(y, m);
+  return {
+    income:  txns.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
+    expense: txns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
+  };
+}
+function last7Days() {
+  const today = new Date();
+  return Array.from({length:7}, (_,i) => {
+    const d = new Date(today); d.setDate(d.getDate()-(6-i));
+    const ds = d.toISOString().slice(0,10);
+    const dayTxns = store.txns.filter(t=>t.date===ds);
+    return {
+      label: TH_DAYS_SHORT[d.getDay()], date:ds,
+      income:  dayTxns.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
+      expense: dayTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
+    };
+  });
+}
+// ── IndexedDB (persistent) + localStorage (mirror) ──────
+const IDB_NAME = 'FinFlowDB';
+const IDB_VER  = 1;
+let _idb = null;
+
+function _openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VER);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+    req.onsuccess  = e => resolve(e.target.result);
+    req.onerror    = ()  => reject(req.error);
+  });
+}
+function _idbGet(key) {
+  return new Promise(resolve => {
+    try {
+      const tx = _idb.transaction('kv','readonly');
+      const r  = tx.objectStore('kv').get(key);
+      r.onsuccess = () => resolve(r.result ?? null);
+      r.onerror   = () => resolve(null);
+    } catch(e) { resolve(null); }
+  });
+}
+function _idbSet(key, val) {
+  return new Promise(resolve => {
+    try {
+      const tx = _idb.transaction('kv','readwrite');
+      tx.objectStore('kv').put(val, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => resolve();
+    } catch(e) { resolve(); }
+  });
+}
+
+async function initStorage() {
+  try { _idb = await _openIDB(); } catch(e) { _idb = null; }
+  // 1) IndexedDB first (immune to iOS ITP 7-day clear)
+  if (_idb) {
+    const idbData = await _idbGet(STORE);
+    if (idbData?.wallets && idbData?.txns) {
+      store = idbData;
+      try { localStorage.setItem(STORE, JSON.stringify(idbData)); } catch(e) {}
+      return;
+    }
+  }
+  // 2) localStorage fallback (migrate to IDB)
+  try {
+    const s = localStorage.getItem(STORE);
+    if (s) {
+      const lsData = JSON.parse(s);
+      if (lsData?.wallets && lsData?.txns) {
+        store = lsData;
+        if (_idb) await _idbSet(STORE, lsData);
+        return;
+      }
+    }
+  } catch(e) {}
+  // 3) defaults
+  store = { wallets: DEFAULT_WALLETS, txns: SAMPLE_TXN };
+}
+
+function saveStore() {
+  // localStorage — fast sync mirror
+  try { localStorage.setItem(STORE, JSON.stringify(store)); } catch(e) {}
+  // IndexedDB — durable async (immune to iOS ITP)
+  if (_idb) {
+    const snap = JSON.parse(JSON.stringify(store));
+    _idbSet(STORE, snap).catch(() => {});
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  THAI VOICE COMMAND PARSER
+// ═══════════════════════════════════════════════════════
+
+// Keywords for type detection
+const INCOME_WORDS  = ['รับ','ได้รับ','โอนเข้า','ฝาก','รายรับ','เพิ่ม','บวก'];
+const EXPENSE_WORDS = ['จ่าย','ซื้อ','ค่า','โอนออก','รายจ่าย','หัก','เสีย','ใช้'];
+
+// Keywords for categories
+const CAT_KEYWORDS = {
+  'เงินเดือน':     ['เงินเดือน','salary','เดือน'],
+  'โบนัส':         ['โบนัส','bonus'],
+  'รายได้เสริม':   ['freelance','รายได้เสริม','งานพิเศษ','part time','part-time'],
+  'เงินโอน':       ['โอน','transfer','คืนเงิน'],
+  'อาหาร':         ['อาหาร','กิน','ข้าว','กาแฟ','ชา','grab food','grabfood','food','ร้าน','ผลไม้','ขนม','เบียร์','หมู','ปลา','ไก่','ก๋วยเตี๋ยว','ส้มตำ'],
+  'เดินทาง':       ['เดินทาง','รถ','bts','mrt','แท็กซี่','taxi','grab','uber','น้ำมัน','ปั๊ม','ตั๋ว','เที่ยวบิน','ขนส่ง','สาธารณะ','วินมอไซค์'],
+  'ช้อปปิ้ง':      ['ช้อปปิ้ง','ซื้อของ','เสื้อ','กางเกง','รองเท้า','lazada','shopee','central','mall','ห้าง','ออนไลน์'],
+  'ค่าสาธารณูปโภค':['ไฟ','น้ำ','อินเตอร์เน็ต','เน็ต','โทรศัพท์','ค่าเช่า','บ้าน','ห้อง','คอนโด','ค่าเช่า'],
+  'สุขภาพ':        ['หมอ','ยา','คลินิก','โรงพยาบาล','วิตามิน','gym','ออกกำลังกาย','ฟิตเนส','ทำฟัน','ตรวจ'],
+  'บันเทิง':       ['หนัง','เกม','netflix','spotify','youtube premium','concert','เที่ยว','ท่องเที่ยว','บันเทิง','karaoke','คาราโอเกะ'],
+  'การศึกษา':      ['หนังสือ','คอร์ส','เรียน','tutor','ค่าเรียน','โรงเรียน','มหาวิทยาลัย','udemy','coursera'],
+  'อื่นๆ':         [],
+};
+
+// Wallet keyword map (walletId → keywords)
+const WALLET_KEYWORDS = {
+  cash:  ['เงินสด','สด','cash','มือ'],
+  kbank: ['กสิกร','kbank','กสิกรไทย','กสิกร์'],
+  tmw:   ['ทรูมันนี่','truemoney','true money','true','wallet','ทรู'],
+};
+
+function parseVoiceCommand(raw) {
+  if (!raw || !raw.trim()) return null;
+  const txt = raw.toLowerCase().trim();
+  const confidence = { type:0, amount:0, cat:0, wallet:0 };
+
+  // ── 1. Transaction type ──────────────────────────────
+  let type = 'expense'; // default
+  let typeConf = 1;     // low confidence default
+
+  const hasIncome  = INCOME_WORDS.some(k => txt.includes(k));
+  const hasExpense = EXPENSE_WORDS.some(k => txt.includes(k));
+
+  if (hasIncome && !hasExpense)       { type='income';  typeConf=3; }
+  else if (hasExpense && !hasIncome)  { type='expense'; typeConf=3; }
+  else if (hasIncome && hasExpense)   { type='expense'; typeConf=2; } // ambiguous → expense
+  else                                { type='expense'; typeConf=1; } // no keyword → assume expense
+  confidence.type = typeConf;
+
+  // ── 2. Amount ────────────────────────────────────────
+  // Match Thai number patterns: 150, 1,500, 1500.50, ๑๕๐
+  // Also convert Thai digit chars
+  const thaiNum = txt.replace(/[๐-๙]/g, d => d.charCodeAt(0)-3664);
+  const amountMatch = thaiNum.match(/(\d[\d,]*(?:\.\d{1,2})?)\s*(?:บาท|฿|bath|b\b)?/i);
+  const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g,'')) : null;
+  confidence.amount = amount ? (amount > 0 ? 3 : 0) : 0;
+
+  // ── 3. Category ──────────────────────────────────────
+  let cat = type === 'income' ? 'เงินเดือน' : 'อาหาร';
+  let catConf = 0;
+  for (const [c, keywords] of Object.entries(CAT_KEYWORDS)) {
+    for (const k of keywords) {
+      if (txt.includes(k)) {
+        // Check it makes sense with the detected type
+        const isIncCat = CAT_INCOME.includes(c);
+        const isExpCat = CAT_EXPENSE.includes(c);
+        if ((type==='income' && isIncCat) || (type==='expense' && isExpCat) || c==='อื่นๆ') {
+          cat = c; catConf = 3; break;
+        }
+      }
+    }
+    if (catConf===3) break;
+  }
+  // If category not found, try cross-type with lower confidence
+  if (catConf===0) {
+    for (const [c, keywords] of Object.entries(CAT_KEYWORDS)) {
+      if (keywords.some(k=>txt.includes(k))) { cat=c; catConf=2; break; }
+    }
+  }
+  if (catConf===0) catConf=1;
+  confidence.cat = catConf;
+
+  // ── 4. Wallet ────────────────────────────────────────
+  let wallet = store.wallets[0]?.id || 'cash';
+  let walletConf = 1;
+  for (const [wid, keywords] of Object.entries(WALLET_KEYWORDS)) {
+    if (keywords.some(k=>txt.includes(k))) {
+      // Check wallet exists in store
+      if (store.wallets.find(w=>w.id===wid)) {
+        wallet=wid; walletConf=3; break;
+      }
+    }
+  }
+  confidence.wallet = walletConf;
+
+  // ── 5. Description (extract the "about" part) ────────
+  let desc = raw;
+
+  const isValid = amount !== null && amount > 0;
+
+  return { type, amount, cat, wallet, desc, confidence, raw, isValid };
+}
+
+// Render parse result card
+function renderParseResult(parsed) {
+  const pr = document.getElementById('parse-result');
+  const vsBtn = document.getElementById('voice-submit-btn');
+
+  if (!parsed) {
+    pr.className = 'parse-result';
+    pr.innerHTML = '<div class="parse-empty">พูดหรือพิมพ์คำสั่ง เพื่อดูผลการวิเคราะห์</div>';
+    vsBtn.style.display = 'none';
+    voiceParsed = null;
+    return;
+  }
+
+  voiceParsed = parsed;
+  const isInc = parsed.type === 'income';
+  const typeColor = isInc ? 'var(--income)' : 'var(--expense)';
+  const typeLabel = isInc ? '+ รายรับ' : '− รายจ่าย';
+  const w = walletById(parsed.wallet);
+  const wc = w ? walletColor(w) : {c:'var(--fg-muted)',s:'var(--surface2)'};
+  const icon = CAT_ICON[parsed.cat] || '📝';
+
+  function confDots(n) {
+    return Array.from({length:3}, (_,i) =>
+      `<div class="conf-dot${i<n?' on':''}"></div>`
+    ).join('');
+  }
+
+  pr.className = 'parse-result ' + (parsed.isValid ? 'valid' : 'invalid');
+  pr.innerHTML = `
+    <div class="pr-header">
+      <span style="color:${typeColor};font-size:13px">${typeLabel}</span>
+      <span style="color:var(--fg-muted);font-size:11px">ความมั่นใจในการแปล</span>
+    </div>
+    <div class="pr-rows">
+      <div class="pr-row">
+        <span class="pr-key">💰 จำนวน</span>
+        <span class="pr-val ${isInc?'inc':'exp'}" style="font-family:'IBM Plex Mono',monospace;font-size:18px">
+          ${parsed.amount ? baht(parsed.amount) : '⚠️ ไม่พบจำนวนเงิน'}
+        </span>
+        <div class="pr-confidence">${confDots(parsed.confidence.amount)}</div>
+      </div>
+      <div class="pr-row">
+        <span class="pr-key">${icon} หมวด</span>
+        <span class="pr-val">${parsed.cat}</span>
+        <div class="pr-confidence">${confDots(parsed.confidence.cat)}</div>
+      </div>
+      <div class="pr-row">
+        <span class="pr-key">${w?w.icon:'💳'} กระเป๋า</span>
+        <span class="pr-val">
+          <span class="wbadge" style="background:${wc.s};color:${wc.c}">${w?w.name:parsed.wallet}</span>
+        </span>
+        <div class="pr-confidence">${confDots(parsed.confidence.wallet)}</div>
+      </div>
+    </div>
+  `;
+
+  vsBtn.style.display = parsed.isValid ? 'block' : 'none';
+}
+
+// Save parsed voice transaction
+function saveVoiceTx() {
+  if (!voiceParsed || !voiceParsed.isValid) return;
+  const newId = Date.now();
+  const tx = {
+    id: newId,
+    date: new Date().toISOString().slice(0,10),
+    type: voiceParsed.type,
+    amount: voiceParsed.amount,
+    cat: voiceParsed.cat,
+    wallet: voiceParsed.wallet,
+    desc: voiceParsed.raw,
+    method: 'voice',
+  };
+  store.txns.push(tx);
+  const w = walletById(voiceParsed.wallet);
+  if (w) {
+    if (tx.type==='income') w.balance += tx.amount;
+    else                    w.balance -= tx.amount;
+  }
+  saveStore();
+  voiceParsed = null;
+  closeOverlay('add-overlay');
+  setTimeout(renderAll, 300);
+}
+
+// ── Example command chips ────────────────────────────────
+const EXAMPLES = [
+  'จ่ายค่าอาหาร 150 บาท เงินสด',
+  'รับเงินเดือน 30000 กสิกร',
+  'ค่ากาแฟ 85 ทรูมันนี่',
+  'ซื้อเสื้อ 790 บาท',
+  'รับ freelance 5000 กสิกร',
+  'ค่าไฟ 1200 บาท kbank',
+  'กิน grab food 320 ทรู',
+];
+
+function renderExChips() {
+  document.getElementById('ex-chips').innerHTML = EXAMPLES.map(ex =>
+    `<button class="ex-chip" onclick="applyExample('${ex.replace(/'/g,"\\'")}')">
+      "${ex}"
+    </button>`
+  ).join('');
+}
+
+function applyExample(txt) {
+  document.getElementById('cmd-input').value = txt;
+  updateTranscript(txt);
+  const parsed = parseVoiceCommand(txt);
+  renderParseResult(parsed);
+}
+
+function updateTranscript(txt) {
+  const box = document.getElementById('transcript-box');
+  if (txt) {
+    box.innerHTML = `<span style="font-size:15px">"${txt}"</span>`;
+    box.classList.add('has-text');
+  } else {
+    box.innerHTML = '<span style="color:var(--fg-muted)">คำพูดของคุณจะปรากฏที่นี่...</span>';
+    box.classList.remove('has-text');
+  }
+}
+
+// Parse button
+document.getElementById('cmd-parse-btn').addEventListener('click', () => {
+  const txt = document.getElementById('cmd-input').value.trim();
+  if (!txt) return;
+  updateTranscript(txt);
+  renderParseResult(parseVoiceCommand(txt));
+});
+
+document.getElementById('cmd-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('cmd-parse-btn').click();
+});
+
+document.getElementById('voice-submit-btn').addEventListener('click', saveVoiceTx);
+
+// ═══════════════════════════════════════════════════════
+//  WEB SPEECH API
+// ═══════════════════════════════════════════════════════
+let recognition = null;
+let isListening = false;
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = 'th-TH';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isListening = true;
+    const btn = document.getElementById('mic-btn');
+    btn.classList.add('listening');
+    btn.innerHTML = '<div class="mic-rings"></div>⏹️';
+    document.getElementById('mic-status').textContent = 'กำลังฟัง... (คลิกเพื่อหยุด)';
+    document.getElementById('mic-status').classList.add('active');
+    updateTranscript('');
+    renderParseResult(null);
+  };
+
+  recognition.onresult = (e) => {
+    const result = Array.from(e.results)
+      .map(r => r[0].transcript).join('');
+    updateTranscript(result);
+    // Parse only on final result
+    if (e.results[e.results.length-1].isFinal) {
+      document.getElementById('cmd-input').value = result;
+      renderParseResult(parseVoiceCommand(result));
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopListening();
+    const msg = e.error === 'not-allowed'
+      ? 'ไม่ได้รับอนุญาตใช้ไมโครโฟน — ใช้การพิมพ์แทนได้'
+      : `ข้อผิดพลาด: ${e.error}`;
+    document.getElementById('mic-status').textContent = msg;
+  };
+
+  recognition.onend = stopListening;
+}
+
+function stopListening() {
+  isListening = false;
+  const btn = document.getElementById('mic-btn');
+  btn.classList.remove('listening');
+  btn.innerHTML = '<div class="mic-rings"></div>🎙️';
+  const statusEl = document.getElementById('mic-status');
+  statusEl.classList.remove('active');
+  statusEl.textContent = 'กดเพื่อเริ่มพูดอีกครั้ง';
+}
+
+document.getElementById('mic-btn').addEventListener('click', () => {
+  if (!SpeechRecognition) {
+    document.getElementById('mic-status').textContent = 'เบราว์เซอร์นี้ไม่รองรับ — ใช้การพิมพ์แทน';
+    document.getElementById('mic-btn').classList.add('unsupported');
+    return;
+  }
+  if (isListening) {
+    recognition.stop();
+  } else {
+    try {
+      recognition.start();
+    } catch(e) {
+      document.getElementById('mic-status').textContent = 'ไม่สามารถเข้าถึงไมโครโฟนได้';
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function renderAll() {
+  renderHeader();
+  renderBalance();
+  renderWallets();
+  renderWalletTypeSummary();
+  renderChart();
+  renderTxList();
+}
+
+function renderHeader() {
+  document.getElementById('month-lbl').textContent = `${TH_MONTHS[viewMonth]} ${viewYear+543}`;
+}
+
+function renderBalance() {
+  document.getElementById('total-balance').textContent = baht(totalBalance());
+  const { income, expense } = monthSums(viewYear, viewMonth);
+  document.getElementById('month-income').textContent  = '+'+baht(income);
+  document.getElementById('month-expense').textContent = '-'+baht(expense);
+}
+
+function renderWallets() {
+  document.getElementById('wallet-grid').innerHTML = store.wallets.map(w => {
+    const wc = walletColor(w);
+    return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
+      <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
+      <div class="wcard-name">${w.name}</div>
+      <div class="wcard-bal">${baht(w.balance)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderChart() {
+  const days = last7Days();
+  const maxVal = Math.max(...days.map(d=>Math.max(d.income,d.expense)), 1);
+  const svg = document.getElementById('chart-svg');
+  const W=300, H=100, pL=28, pR=6, pT=6, pB=20;
+  const cW=W-pL-pR, cH=H-pT-pB, gW=cW/7, bW=gW*0.32;
+  let p = `<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+cH}" stroke="var(--border)" stroke-width="1"/>`;
+  [0,.5,1].forEach(f => {
+    const y=pT+cH*(1-f);
+    p += `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>`;
+    if (f>0) p += `<text x="${pL-3}" y="${y+3}" text-anchor="end" font-size="7" fill="var(--fg-muted)">${bahtShort(maxVal*f)}</text>`;
+  });
+  days.forEach((day,i) => {
+    const gx = pL+i*gW+gW/2;
+    const cx = gx-bW/2-0.5;
+    if (day.income>0)  { const ih=(day.income/maxVal)*cH;  p+=`<rect x="${cx-bW-.5}" y="${pT+cH-ih}" width="${bW}" height="${ih}" rx="2" fill="var(--income)" opacity=".85"/>`; }
+    if (day.expense>0) { const eh=(day.expense/maxVal)*cH; p+=`<rect x="${cx+.5}" y="${pT+cH-eh}" width="${bW}" height="${eh}" rx="2" fill="var(--expense)" opacity=".85"/>`; }
+    const isToday = day.date===new Date().toISOString().slice(0,10);
+    p += `<text x="${gx}" y="${H-2}" text-anchor="middle" font-size="8"
+      fill="${isToday?'var(--accent)':'var(--fg-muted)'}"
+      font-weight="${isToday?'700':'400'}">${day.label}</text>`;
+  });
+  svg.innerHTML = p;
+}
+
+function renderTxList() {
+  const txns = monthTxns(viewYear, viewMonth);
+  const list = document.getElementById('tx-list');
+  document.getElementById('tx-count').textContent = txns.length+' รายการ';
+  if (!txns.length) {
+    list.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--fg-muted);font-size:13px">
+      ยังไม่มีรายการในเดือนนี้<br>กด <strong>＋</strong> เพื่อเพิ่มรายการแรก</div>`;
+    return;
+  }
+  list.innerHTML = txns.map(tx => {
+    const w=walletById(tx.wallet);
+    const wc=w?walletColor(w):{c:'var(--fg-muted)',s:'var(--surface2)'};
+    const isInc=tx.type==='income';
+    const icon=CAT_ICON[tx.cat]||'📝';
+    const icoBg=isInc?'var(--income-s)':'var(--expense-s)';
+    const icoC=isInc?'var(--income)':'var(--expense)';
+    return `<div class="txcard" onclick="openTxDetail(${tx.id})">
+      <div class="tx-ico" style="background:${icoBg};color:${icoC}">${icon}</div>
+      <div class="tx-info">
+        <div class="tx-cat">${tx.cat}</div>
+        <div class="tx-meta">
+          ${w?`<span class="wbadge" style="background:${wc.s};color:${wc.c}">${w.name}</span>`:''}
+          <span class="method-badge">${METHOD_LABEL[tx.method]||'✏️'}</span>
+        </div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${baht(tx.amount)}</div>
+        <div class="tx-date-sm">${fmtDate(tx.date)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  OVERLAYS
+// ═══════════════════════════════════════════════════════
+function openOverlay(id) {
+  const el=document.getElementById(id);
+  el.hidden=false; void el.offsetWidth; el.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeOverlay(id) {
+  const el=document.getElementById(id);
+  el.classList.remove('open');
+  document.body.style.overflow='';
+  el.addEventListener('transitionend', ()=>{ el.hidden=true; },{once:true});
+  if (isListening) { try{recognition.stop();}catch(e){} }
+}
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) closeOverlay(ov.id); });
+});
+document.querySelectorAll('[data-close]').forEach(btn=>{
+  btn.addEventListener('click', ()=>closeOverlay(btn.dataset.close));
+});
+
+// ═══════════════════════════════════════════════════════
+//  TRANSACTION DETAIL
+// ═══════════════════════════════════════════════════════
+function openTxDetail(id) {
+  const tx=store.txns.find(t=>t.id===id); if(!tx) return;
+  const w=walletById(tx.wallet);
+  const wc=w?walletColor(w):{c:'var(--fg-muted)',s:'var(--surface2)'};
+  const isInc=tx.type==='income';
+  const icon=CAT_ICON[tx.cat]||'📝';
+  const amtColor=isInc?'var(--income)':'var(--expense)';
+  const pillBg=isInc?'var(--income-s)':'var(--expense-s)';
+  const pillC=isInc?'var(--income)':'var(--expense)';
+  document.getElementById('tx-detail-body').innerHTML = `
+    <div class="detail-top">
+      <div style="font-size:48px;margin-bottom:8px">${icon}</div>
+      <div class="detail-type-pill" style="background:${pillBg};color:${pillC}">${isInc?'รายรับ':'รายจ่าย'}</div>
+      <div class="detail-amount" style="color:${amtColor}">${isInc?'+':'−'}${baht(tx.amount)}</div>
+    </div>
+    <div class="detail-rows">
+      <div class="drow"><span class="drow-lbl">หมวดหมู่</span><span class="drow-val">${tx.cat}</span></div>
+      <div class="drow"><span class="drow-lbl">กระเป๋าเงิน</span>
+        <span class="drow-val"><span class="wbadge" style="background:${wc.s};color:${wc.c}">${w?w.name:tx.wallet}</span></span></div>
+      <div class="drow"><span class="drow-lbl">วันที่</span><span class="drow-val">${fmtDate(tx.date)}</span></div>
+      ${tx.desc?`<div class="drow"><span class="drow-lbl">หมายเหตุ</span><span class="drow-val" style="min-width:0">${tx.desc}</span></div>`:''}
+      <div class="drow"><span class="drow-lbl">วิธีบันทึก</span><span class="drow-val">${METHOD_LABEL[tx.method]||tx.method}</span></div>
+    </div>
+    <button onclick="deleteTx(${tx.id})" style="
+      width:100%;padding:11px;margin-top:16px;
+      background:var(--expense-s);color:var(--expense);
+      border:1px solid var(--expense-s);border-radius:var(--rad);
+      font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+    ">🗑 ลบรายการนี้</button>`;
+  openOverlay('tx-overlay');
+}
+
+function deleteTx(id) {
+  const tx=store.txns.find(t=>t.id===id); if(!tx) return;
+  const w=walletById(tx.wallet);
+  if(w) { if(tx.type==='income') w.balance-=tx.amount; else w.balance+=tx.amount; }
+  store.txns=store.txns.filter(t=>t.id!==id);
+  saveStore(); closeOverlay('tx-overlay'); setTimeout(renderAll,300);
+}
+
+// ═══════════════════════════════════════════════════════
+//  WALLET DETAIL
+// ═══════════════════════════════════════════════════════
+function openWalletDetail(wid) {
+  const w=walletById(wid); if(!w) return;
+  const wc=walletColor(w);
+  const wTxns=store.txns.filter(t=>t.wallet===wid)
+    .sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,20);
+  const income=wTxns.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense=wTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const txHtml=wTxns.map(tx=>{
+    const icon=CAT_ICON[tx.cat]||'📝';
+    const isInc=tx.type==='income';
+    const icoBg=isInc?'var(--income-s)':'var(--expense-s)';
+    const icoC=isInc?'var(--income)':'var(--expense)';
+    return `<div class="txcard" onclick="closeOverlay('wallet-overlay');setTimeout(()=>openTxDetail(${tx.id}),200)">
+      <div class="tx-ico" style="background:${icoBg};color:${icoC}">${icon}</div>
+      <div class="tx-info"><div class="tx-cat">${tx.cat}</div><div class="tx-meta">${fmtDate(tx.date)}</div></div>
+      <div class="tx-right"><div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${baht(tx.amount)}</div></div>
+    </div>`;
+  }).join('')||'<div style="text-align:center;padding:24px;color:var(--fg-muted);font-size:13px">ยังไม่มีรายการ</div>';
+  document.getElementById('wallet-detail-content').innerHTML=`
+    <div class="drag-pill" style="margin-top:10px"></div>
+    <div class="sheet-hdr">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="wcard-icon" style="width:46px;height:46px;border-radius:14px;background:${wc.s};color:${wc.c};font-size:22px">${w.icon}</div>
+        <div>
+          <div style="font-size:15px;font-weight:700">${w.name}</div>
+          <div style="font-size:22px;font-weight:700;color:${wc.c};font-family:'IBM Plex Mono',monospace">${baht(w.balance)}</div>
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeOverlay('wallet-overlay')">✕</button>
+    </div>
+    <div style="display:flex;background:var(--surface2);margin:0 14px 14px;border-radius:var(--rad-s);overflow:hidden;">
+      <div style="flex:1;padding:10px 14px;">
+        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">รายรับรวม</div>
+        <div style="font-size:16px;font-weight:700;color:var(--income);font-family:'IBM Plex Mono',monospace">+${baht(income)}</div>
+      </div>
+      <div style="flex:1;padding:10px 14px;border-left:1px solid var(--border);">
+        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">รายจ่ายรวม</div>
+        <div style="font-size:16px;font-weight:700;color:var(--expense);font-family:'IBM Plex Mono',monospace">−${baht(expense)}</div>
+      </div>
+    </div>
+    <div style="padding:0 14px 8px;font-size:13px;font-weight:700;color:var(--fg2)">รายการล่าสุด</div>
+    <div style="padding:0 14px 20px;display:flex;flex-direction:column;gap:5px">${txHtml}</div>`;
+  openOverlay('wallet-overlay');
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADD TRANSACTION (MANUAL)
+// ═══════════════════════════════════════════════════════
+function openAddSheet() {
+  formType='income'; formCat=''; formWallet=store.wallets[0]?.id||'';
+  document.getElementById('inp-amount').value='';
+  document.getElementById('inp-desc').value='';
+  document.getElementById('inp-date').value=new Date().toISOString().slice(0,10);
+  updateTypeToggle(); renderCatGrid(); renderWalletOpts();
+  // Reset voice panel
+  updateTranscript(''); renderParseResult(null);
+  document.getElementById('cmd-input').value='';
+  switchTab('manual');
+  openOverlay('add-overlay');
+}
+
+function updateTypeToggle() {
+  document.getElementById('type-income').classList.toggle('active', formType==='income');
+  document.getElementById('type-expense').classList.toggle('active', formType==='expense');
+  renderCatGrid();
+}
+
+function renderCatGrid() {
+  const cats = formType==='income'?CAT_INCOME:CAT_EXPENSE;
+  if (!formCat||!cats.includes(formCat)) formCat=cats[0];
+  document.getElementById('cat-grid').innerHTML=cats.map(c=>
+    `<button class="cat-chip${c===formCat?' sel':''}" onclick="selectCat('${c}')">
+      ${CAT_ICON[c]||''} ${c}</button>`
+  ).join('');
+}
+
+function selectCat(c) {
+  formCat=c;
+  document.querySelectorAll('.cat-chip').forEach(b=>{
+    b.classList.toggle('sel', b.textContent.trim().replace(/\s+/g,' ').includes(c));
+  });
+}
+
+function renderWalletOpts() {
+  if (!formWallet) formWallet=store.wallets[0]?.id||'';
+  document.getElementById('wallet-opts').innerHTML=store.wallets.map(w=>{
+    const wc=walletColor(w);
+    return `<div class="wopt${w.id===formWallet?' sel':''}" onclick="selectWallet('${w.id}')">
+      <div style="width:30px;height:30px;border-radius:8px;background:${wc.s};color:${wc.c};display:flex;align-items:center;justify-content:center;font-size:15px">${w.icon}</div>
+      <span class="wopt-name">${w.name}</span>
+      <span class="wopt-bal">${baht(w.balance)}</span>
+    </div>`;
+  }).join('');
+}
+
+function selectWallet(id) { formWallet=id; renderWalletOpts(); }
+
+function switchTab(tab) {
+  ['manual','voice','slip'].forEach(t=>{
+    document.getElementById(`panel-${t}`).hidden=(t!==tab);
+    document.getElementById(`tab-${t}`).classList.toggle('active',t===tab);
+  });
+}
+
+document.querySelectorAll('.tab-btn[data-tab]').forEach(btn=>{
+  btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
+});
+document.getElementById('type-income').addEventListener('click', ()=>{formType='income';updateTypeToggle();});
+document.getElementById('type-expense').addEventListener('click', ()=>{formType='expense';updateTypeToggle();});
+document.getElementById('fab-btn').addEventListener('click', openAddSheet);
+
+document.getElementById('submit-btn').addEventListener('click', ()=>{
+  const amount=parseFloat(document.getElementById('inp-amount').value);
+  if (!amount||amount<=0) {
+    const inp=document.getElementById('inp-amount');
+    inp.focus(); inp.style.borderColor='var(--expense)';
+    setTimeout(()=>inp.style.borderColor='',1200); return;
+  }
+  const tx={
+    id:Date.now(), date:document.getElementById('inp-date').value||new Date().toISOString().slice(0,10),
+    type:formType, amount, cat:formCat, wallet:formWallet,
+    desc:document.getElementById('inp-desc').value.trim(), method:'manual',
+  };
+  store.txns.push(tx);
+  const w=walletById(formWallet);
+  if(w){ if(formType==='income') w.balance+=amount; else w.balance-=amount; }
+  saveStore(); closeOverlay('add-overlay'); setTimeout(renderAll,300);
+});
+
+// ═══════════════════════════════════════════════════════
+//  MONTH NAV & THEME
+// ═══════════════════════════════════════════════════════
+document.getElementById('prev-month').addEventListener('click', ()=>{
+  viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} renderAll();
+});
+document.getElementById('next-month').addEventListener('click', ()=>{
+  viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} renderAll();
+});
+
+let darkMode=false;
+try{darkMode=localStorage.getItem('finflow_theme')==='dark';}catch(e){}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme',darkMode?'dark':'light');
+  document.getElementById('theme-btn').textContent=darkMode?'☀️ Light':'🌙 Dark';
+  try{localStorage.setItem('finflow_theme',darkMode?'dark':'light');}catch(e){}
+}
+document.getElementById('theme-btn').addEventListener('click',()=>{darkMode=!darkMode;applyTheme();});
+
+// ═══════════════════════════════════════════════════════
+//  INIT (async — IndexedDB must resolve first)
+// ═══════════════════════════════════════════════════════
+(async () => {
+  await initStorage();
+  const now = new Date();
+  viewYear  = now.getFullYear();
+  viewMonth = now.getMonth();
+  applyTheme();
+  renderAll();
+  renderExChips();
+  if (!SpeechRecognition) {
+    document.getElementById('mic-status').textContent = 'เบราว์เซอร์นี้ไม่รองรับ Voice — ใช้การพิมพ์แทน';
+    document.getElementById('mic-btn').classList.add('unsupported');
+  }
+})();
+
+// ═══════════════════════════════════════════════════════
+//  SLIP OCR FEATURE
+// ═══════════════════════════════════════════════════════
+
+// ── API Key management ───────────────────────────────
+function getSlipApiKey() {
+  try { return localStorage.getItem('finflow_ocr_key')||''; } catch(e){ return ''; }
+}
+function setSlipApiKey(k) {
+  try { localStorage.setItem('finflow_ocr_key', k); } catch(e){}
+}
+function updateKeyBadge() {
+  const k = getSlipApiKey();
+  const badge = document.getElementById('slip-key-status-badge');
+  if (k) {
+    badge.textContent = '✅ ตั้งค่าแล้ว';
+    badge.className = 'slip-key-status ok';
+  } else {
+    badge.textContent = 'ยังไม่ตั้งค่า';
+    badge.className = 'slip-key-status none';
+  }
+}
+document.getElementById('slip-api-key').value = getSlipApiKey();
+updateKeyBadge();
+document.getElementById('slip-save-key').addEventListener('click', () => {
+  const k = document.getElementById('slip-api-key').value.trim();
+  setSlipApiKey(k);
+  updateKeyBadge();
+  document.getElementById('slip-settings').open = false;
+});
+
+// ── State ────────────────────────────────────────────
+let slipImageDataUrl = null;
+let slipParsed = null;
+
+// ── Upload handlers ──────────────────────────────────
+function handleSlipFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    slipImageDataUrl = e.target.result;
+    showSlipPreview(slipImageDataUrl);
+  };
+  reader.readAsDataURL(file);
+}
+
+['slip-file-cam','slip-file-hidden'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    if (e.target.files[0]) handleSlipFile(e.target.files[0]);
+  });
+});
+
+// Drag & drop
+const uploadZone = document.getElementById('slip-upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.borderColor='var(--accent)'; });
+uploadZone.addEventListener('dragleave', () => { uploadZone.style.borderColor=''; });
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.style.borderColor='';
+  const f = e.dataTransfer?.files[0];
+  if (f) handleSlipFile(f);
+});
+
+document.getElementById('slip-change-btn').addEventListener('click', () => {
+  slipImageDataUrl = null; slipParsed = null;
+  document.getElementById('slip-preview-wrap').hidden = true;
+  document.getElementById('slip-upload-zone').hidden = false;
+  document.getElementById('slip-scan-btn').hidden = true;
+  document.getElementById('slip-result').hidden = true;
+  document.getElementById('slip-submit-btn').hidden = true;
+  document.getElementById('slip-error').hidden = true;
+});
+
+function showSlipPreview(dataUrl) {
+  document.getElementById('slip-upload-zone').hidden = true;
+  const img = document.getElementById('slip-preview-img');
+  img.src = dataUrl;
+  document.getElementById('slip-preview-wrap').hidden = false;
+  document.getElementById('slip-scan-btn').hidden = false;
+  document.getElementById('slip-result').hidden = true;
+  document.getElementById('slip-submit-btn').hidden = true;
+  document.getElementById('slip-error').hidden = true;
+}
+
+// ── OCR.space API call ───────────────────────────────
+async function callOcrSpace(dataUrl, apiKey) {
+  // Convert dataURL to blob
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  const u8arr = new Uint8Array(bstr.length);
+  for (let i=0; i<bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+  const blob = new Blob([u8arr], {type: mime});
+
+  const fd = new FormData();
+  fd.append('file', blob, 'slip.jpg');
+  fd.append('language', 'tha');           // Thai primary
+  fd.append('isOverlayRequired', 'false');
+  fd.append('detectOrientation', 'true');
+  fd.append('scale', 'true');
+  fd.append('OCREngine', '2');            // Better for printed text
+  fd.append('filetype', mime.split('/')[1].toUpperCase());
+
+  const resp = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    headers: { 'apikey': apiKey },
+    body: fd,
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.IsErroredOnProcessing) throw new Error(json.ErrorMessage?.[0] || 'OCR Error');
+  return json.ParsedResults?.[0]?.ParsedText || '';
+}
+
+// ── Thai bank slip text parser ───────────────────────
+function parseSlipText(text) {
+  const t = text;
+  const tl = text.toLowerCase();
+
+  // ── Amount ──
+  let amount = null;
+  const amtPatterns = [
+    /จำนวนเงิน\s*:?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /amount\s*:?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /(?:รวม|total)\s*:?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    /฿\s*([\d,]+(?:\.\d{1,2})?)/,
+    /([\d,]{3,}(?:\.\d{2})?)\s*(?:บาท|thb|baht)/i,
+  ];
+  for (const p of amtPatterns) {
+    const m = t.match(p);
+    if (m) { const v = parseFloat(m[1].replace(/,/g,'')); if (v>0) { amount=v; break; } }
+  }
+
+  // ── Date ──
+  let date = new Date().toISOString().slice(0,10);
+  const TH_MONTH_SHORT = {
+    'ม.ค':1,'ก.พ':2,'มี.ค':3,'เม.ย':4,'พ.ค':5,'มิ.ย':6,
+    'ก.ค':7,'ส.ค':8,'ก.ย':9,'ต.ค':10,'พ.ย':11,'ธ.ค':12,
+    'ม.ค.':1,'ก.พ.':2,'มี.ค.':3,'เม.ย.':4,'พ.ค.':5,'มิ.ย.':6,
+    'ก.ค.':7,'ส.ค.':8,'ก.ย.':9,'ต.ค.':10,'พ.ย.':11,'ธ.ค.':12,
+    'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,
+    'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12,
+  };
+  // Pattern: DD/MM/YYYY or DD-MM-YYYY
+  const dmy = t.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (dmy) {
+    let yr = parseInt(dmy[3]);
+    if (yr > 2400) yr -= 543; // convert Buddhist year
+    else if (yr < 100) yr += 2000;
+    date = `${yr}-${String(dmy[2]).padStart(2,'0')}-${String(dmy[1]).padStart(2,'0')}`;
+  }
+  // Pattern: DD MonthTH YYYY
+  const thDate = t.match(/(\d{1,2})\s+(ม\.?ค\.?|ก\.?พ\.?|มี\.?ค\.?|เม\.?ย\.?|พ\.?ค\.?|มิ\.?ย\.?|ก\.?ค\.?|ส\.?ค\.?|ก\.?ย\.?|ต\.?ค\.?|พ\.?ย\.?|ธ\.?ค\.?)\s+(\d{2,4})/i);
+  if (thDate) {
+    const mo = TH_MONTH_SHORT[thDate[2].replace(/\s/g,'')]||1;
+    let yr = parseInt(thDate[3]);
+    if (yr > 2400) yr -= 543;
+    date = `${yr}-${String(mo).padStart(2,'0')}-${String(thDate[1]).padStart(2,'0')}`;
+  }
+
+  // ── Bank / wallet detection ──
+  const BANK_MAP = {
+    kbank:  ['kbank','กสิกร','kasikorn','k plus','k-plus'],
+    scb:    ['scb','ไทยพาณิชย์','siam commercial'],
+    krungthai: ['ktb','กรุงไทย','krungthai'],
+    bbl:    ['bbl','กรุงเทพ','bangkok bank'],
+    tmw:    ['truemoney','true money','ทรูมันนี่','ทรู มันนี่','tmw'],
+    promptpay: ['พร้อมเพย์','promptpay','prompt pay'],
+  };
+  let detectedBank = '';
+  for (const [bk, kws] of Object.entries(BANK_MAP)) {
+    if (kws.some(k=>tl.includes(k))) { detectedBank=bk; break; }
+  }
+  // Match to store wallet
+  let walletId = store.wallets[0]?.id || 'cash';
+  if (detectedBank==='tmw' && store.wallets.find(w=>w.id==='tmw')) walletId='tmw';
+  else if (['kbank','scb','ktb','bbl'].includes(detectedBank) && store.wallets.find(w=>w.id==='kbank')) walletId='kbank';
+
+  // ── Type: most slips are expense ──
+  const isIncome = /รับโอน|ได้รับเงิน|received|โอนเข้า|เข้าบัญชี/i.test(t);
+  const type = isIncome ? 'income' : 'expense';
+
+  // ── Reference / description ──
+  const refMatch = t.match(/(?:เลขอ้างอิง|ref(?:erence)?\.?|transaction\s*(?:id)?|รหัสรายการ)\s*:?\s*([A-Z0-9]{6,25})/i);
+  const ref = refMatch ? refMatch[1] : '';
+
+  // ── Category guess ──
+  let cat = type==='income' ? 'เงินโอน' : 'เดินทาง';
+  if (/grab|food|อาหาร|ร้าน|บุฟเฟ่|pizza|kfc|mcdonald/i.test(tl)) cat='อาหาร';
+  else if (/central|lazada|shopee|เสื้อ|ห้าง|mall/i.test(tl)) cat='ช้อปปิ้ง';
+  else if (/bts|mrt|รถ|taxi|grab(?!food)|แท็กซี่/i.test(tl)) cat='เดินทาง';
+  else if (/โรงพยาบาล|คลินิก|ยา|หมอ|hospital/i.test(tl)) cat='สุขภาพ';
+  else if (/ไฟฟ้า|ประปา|น้ำ|ค่าเช่า|internet|เน็ต/i.test(tl)) cat='ค่าสาธารณูปโภค';
+  else if (/เงินเดือน|salary/i.test(tl)) cat='เงินเดือน';
+  else if (type==='income') cat='เงินโอน';
+  else cat='อื่นๆ';
+
+  return { type, amount, date, walletId, cat, ref, rawText: text, isValid: amount!==null && amount>0 };
+}
+
+// ── Render parsed result ─────────────────────────────
+function renderSlipResult(parsed) {
+  slipParsed = parsed;
+  const result = document.getElementById('slip-result');
+  const isInc = parsed.type === 'income';
+  const wallets = store.wallets;
+  const catList = isInc ? CAT_INCOME : CAT_EXPENSE;
+
+  result.innerHTML = `
+    <div class="slip-result-card">
+      <div class="slip-result-hdr">
+        ✅ วิเคราะห์สลิปแล้ว — กรุณาตรวจสอบข้อมูล
+      </div>
+      <div class="slip-result-fields">
+        <div class="slip-field">
+          <div class="slip-field-lbl">ประเภทรายการ</div>
+          <div class="slip-type-toggle">
+            <button class="slip-type-btn ${!isInc?'active exp':''}" onclick="updateSlipType('expense')">− รายจ่าย</button>
+            <button class="slip-type-btn ${isInc?'active inc':''}" onclick="updateSlipType('income')">+ รายรับ</button>
+          </div>
+        </div>
+        <div class="slip-field-row">
+          <div class="slip-field">
+            <div class="slip-field-lbl">จำนวนเงิน (฿)</div>
+            <input type="number" id="slip-amount" value="${parsed.amount||''}" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="slip-field">
+            <div class="slip-field-lbl">วันที่</div>
+            <input type="date" id="slip-date" value="${parsed.date}">
+          </div>
+        </div>
+        <div class="slip-field">
+          <div class="slip-field-lbl">หมวดหมู่</div>
+          <select id="slip-cat">
+            ${catList.map(c=>`<option value="${c}" ${c===parsed.cat?'selected':''}>${CAT_ICON[c]||''} ${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="slip-field">
+          <div class="slip-field-lbl">กระเป๋าเงิน</div>
+          <select id="slip-wallet">
+            ${wallets.map(w=>`<option value="${w.id}" ${w.id===parsed.walletId?'selected':''}>${w.icon} ${w.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="slip-field">
+          <div class="slip-field-lbl">หมายเหตุ / เลขอ้างอิง</div>
+          <input type="text" id="slip-desc" value="${parsed.ref||''}" placeholder="เพิ่มหมายเหตุ (ไม่บังคับ)">
+        </div>
+      </div>
+      ${parsed.rawText ? `<div class="slip-raw-wrap">
+        <button class="slip-raw-toggle" onclick="this.nextElementSibling.classList.toggle('show')">
+          📄 ดูข้อความ OCR ดิบ
+        </button>
+        <pre class="slip-raw-text">${parsed.rawText.replace(/</g,'&lt;')}</pre>
+      </div>` : ''}
+    </div>`;
+
+  result.hidden = false;
+  document.getElementById('slip-submit-btn').hidden = !parsed.isValid;
+}
+
+function updateSlipType(t) {
+  if (!slipParsed) return;
+  slipParsed.type = t;
+  renderSlipResult(slipParsed);
+}
+
+// ── Scan button handler ──────────────────────────────
+document.getElementById('slip-scan-btn').addEventListener('click', async () => {
+  if (!slipImageDataUrl) return;
+
+  const apiKey = getSlipApiKey();
+  const scanBtn   = document.getElementById('slip-scan-btn');
+  const procEl    = document.getElementById('slip-processing');
+  const procText  = document.getElementById('slip-proc-text');
+  const procSteps = document.getElementById('slip-proc-steps');
+  const errEl     = document.getElementById('slip-error');
+
+  scanBtn.hidden = true;
+  procEl.hidden  = false;
+  errEl.hidden   = true;
+  document.getElementById('slip-result').hidden = true;
+  document.getElementById('slip-submit-btn').hidden = true;
+
+  // Animated progress steps
+  const steps = [
+    'กำลังส่งรูปภาพ...',
+    'AI กำลังอ่านตัวอักษร...',
+    'วิเคราะห์ข้อมูลสลิป...',
+    'แยกจำนวนเงินและวันที่...',
+  ];
+  let stepIdx = 0;
+  const stepTimer = setInterval(() => {
+    procText.textContent = steps[Math.min(stepIdx++, steps.length-1)];
+  }, 900);
+
+  try {
+    if (!apiKey) throw new Error('NO_KEY');
+
+    const rawText = await callOcrSpace(slipImageDataUrl, apiKey);
+    clearInterval(stepTimer);
+    procEl.hidden = true;
+    scanBtn.hidden = false;
+    scanBtn.textContent = '🔄 สแกนอีกครั้ง';
+
+    if (!rawText.trim()) throw new Error('EMPTY');
+    const parsed = parseSlipText(rawText);
+    renderSlipResult(parsed);
+
+  } catch(err) {
+    clearInterval(stepTimer);
+    procEl.hidden = true;
+    scanBtn.hidden = false;
+    scanBtn.textContent = '🔄 ลองสแกนอีกครั้ง';
+
+    errEl.hidden = false;
+    if (err.message === 'NO_KEY') {
+      document.getElementById('slip-error-title').textContent = '🔑 ยังไม่มี API Key';
+      document.getElementById('slip-error-hint').textContent =
+        'กรุณาตั้งค่า OCR API Key ด้านล่าง (ฟรี) เพื่อสแกนอัตโนมัติ หรือกรอกข้อมูลด้วยตนเอง';
+      // Show manual fallback
+      renderSlipResult({
+        type:'expense', amount:null, date:new Date().toISOString().slice(0,10),
+        walletId:store.wallets[0]?.id||'cash', cat:'อื่นๆ', ref:'', rawText:'',
+        isValid:false,
+      });
+    } else if (err.message === 'EMPTY') {
+      document.getElementById('slip-error-title').textContent = '⚠️ ไม่พบข้อความในภาพ';
+      document.getElementById('slip-error-hint').textContent =
+        'ลองถ่ายภาพให้ชัดขึ้น ใช้แสงที่เพียงพอ และตรวจสอบว่าสลิปอยู่ในกรอบ';
+    } else {
+      document.getElementById('slip-error-title').textContent = '⚠️ เกิดข้อผิดพลาด';
+      document.getElementById('slip-error-hint').textContent = err.message + ' — กรอกข้อมูลด้วยตนเองได้';
+      renderSlipResult({
+        type:'expense', amount:null, date:new Date().toISOString().slice(0,10),
+        walletId:store.wallets[0]?.id||'cash', cat:'อื่นๆ', ref:'', rawText:'',
+        isValid:false,
+      });
+    }
+  }
+});
+
+// ── Save slip transaction ────────────────────────────
+document.getElementById('slip-submit-btn').addEventListener('click', () => {
+  const amount = parseFloat(document.getElementById('slip-amount').value);
+  if (!amount || amount <= 0) {
+    document.getElementById('slip-amount').focus();
+    document.getElementById('slip-amount').style.borderColor='var(--expense)';
+    setTimeout(()=>{ document.getElementById('slip-amount').style.borderColor=''; },1200);
+    return;
+  }
+  const tx = {
+    id: Date.now(),
+    date: document.getElementById('slip-date').value || new Date().toISOString().slice(0,10),
+    type: slipParsed?.type || 'expense',
+    amount,
+    cat:  document.getElementById('slip-cat').value,
+    wallet: document.getElementById('slip-wallet').value,
+    desc: document.getElementById('slip-desc').value.trim(),
+    method: 'slip',
+  };
+  store.txns.push(tx);
+  const w = walletById(tx.wallet);
+  if (w) { if(tx.type==='income') w.balance+=tx.amount; else w.balance-=tx.amount; }
+  saveStore();
+  slipParsed = null;
+  slipImageDataUrl = null;
+  closeOverlay('add-overlay');
+  setTimeout(renderAll, 300);
+});
+
+// Reset slip panel when closing the add sheet
+document.querySelectorAll('[data-close="add-overlay"], .overlay#add-overlay').forEach(el => {
+  el.addEventListener('click', e => {
+    if (el.dataset.close || e.target===el) {
+      // Reset slip state
+      setTimeout(() => {
+        document.getElementById('slip-upload-zone').hidden = false;
+        document.getElementById('slip-preview-wrap').hidden = true;
+        document.getElementById('slip-scan-btn').hidden = true;
+        document.getElementById('slip-processing').hidden = true;
+        document.getElementById('slip-error').hidden = true;
+        document.getElementById('slip-result').hidden = true;
+        document.getElementById('slip-submit-btn').hidden = true;
+        slipImageDataUrl = null; slipParsed = null;
+      }, 400);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT (CSV / EXCEL)
+// ═══════════════════════════════════════════════════════
+let exportScope = 'month';  // 'all' | 'month' | 'range'
+const EXPORT_COLS = [
+  { key:'date',    label:'วันที่',        on:true  },
+  { key:'type',    label:'ประเภท',       on:true  },
+  { key:'amount',  label:'จำนวนเงิน',    on:true  },
+  { key:'cat',     label:'หมวดหมู่',     on:true  },
+  { key:'wallet',  label:'กระเป๋าเงิน', on:true  },
+  { key:'desc',    label:'หมายเหตุ',     on:true  },
+  { key:'method',  label:'วิธีบันทึก',   on:false },
+  { key:'balance', label:'ยอดหลังรายการ',on:false },
+];
+
+function openExport() {
+  renderExportBody();
+  openOverlay('export-overlay');
+  // Show last backup date
+  try {
+    const ts = localStorage.getItem('finflow_last_backup');
+    const lbl = document.getElementById('backup-last-lbl');
+    if (lbl && ts) {
+      const d = new Date(parseInt(ts,10));
+      lbl.textContent = `สำรองล่าสุด: ${d.toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})}`;
+    }
+  } catch(e) {}
+}
+
+function getExportTxns() {
+  let txns = [...store.txns].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+  if (exportScope === 'month') {
+    txns = txns.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear()===viewYear && d.getMonth()===viewMonth;
+    });
+  } else if (exportScope === 'range') {
+    const from = document.getElementById('exp-from')?.value;
+    const to   = document.getElementById('exp-to')?.value;
+    if (from) txns = txns.filter(t => t.date >= from);
+    if (to)   txns = txns.filter(t => t.date <= to);
+  }
+  return txns;
+}
+
+function renderExportBody() {
+  const txns = getExportTxns();
+  const body = document.getElementById('export-body');
+  const now  = new Date();
+  const defFrom = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-01`;
+  const defTo   = new Date(viewYear, viewMonth+1, 0).toISOString().slice(0,10);
+  const colsHtml = EXPORT_COLS.map((c,i)=>
+    `<div class="export-col-chip${c.on?' on':''}" onclick="toggleExportCol(${i})">
+      <div class="export-col-chip-dot"></div>${c.label}
+    </div>`
+  ).join('');
+  body.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;letter-spacing:.05em">ขอบเขตข้อมูล</div>
+    <div class="export-scope-row" id="exp-scope-row">
+      <button class="export-scope-btn${exportScope==='month'?' active':''}" onclick="setExportScope('month')">เดือนนี้</button>
+      <button class="export-scope-btn${exportScope==='range'?' active':''}" onclick="setExportScope('range')">ช่วงวันที่</button>
+      <button class="export-scope-btn${exportScope==='all'?' active':''}"   onclick="setExportScope('all')">ทั้งหมด</button>
+    </div>
+    <div class="export-date-range" id="exp-range-wrap" ${exportScope!=='range'?'style="display:none"':''}>
+      <input type="date" id="exp-from" value="${defFrom}" onchange="refreshExportPreview()">
+      <input type="date" id="exp-to"   value="${defTo}"   onchange="refreshExportPreview()">
+    </div>
+    <div class="export-preview-row">
+      <span>รายการที่พบ</span>
+      <span class="export-preview-count" id="exp-count">${txns.length} รายการ</span>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;letter-spacing:.05em">คอลัมน์ที่ต้องการ</div>
+    <div class="export-cols-grid">${colsHtml}</div>
+    <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:10px;letter-spacing:.05em">เลือกรูปแบบ</div>
+    <div class="export-fmt-grid">
+      <div class="export-fmt-card" onclick="doExport('csv')">
+        <div class="export-fmt-icon">📄</div>
+        <div class="export-fmt-name">CSV</div>
+        <div class="export-fmt-sub">Excel, Google Sheets<br>เปิดได้ทุกโปรแกรม</div>
+      </div>
+      <div class="export-fmt-card" onclick="doExport('xls')">
+        <div class="export-fmt-icon">📊</div>
+        <div class="export-fmt-name">Excel</div>
+        <div class="export-fmt-sub">Microsoft Excel<br>มีแท็บสรุป</div>
+      </div>
+    </div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:10px;letter-spacing:.05em">🔐 สำรอง / กู้คืนข้อมูล</div>
+      <div style="font-size:12px;color:var(--fg-muted);margin-bottom:10px">ข้อมูลถูกเก็บบน IndexedDB (ถาวร) ควรสำรองไฟล์ JSON ไว้เผื่อเปลี่ยนเครื่อง</div>
+      <div class="export-fmt-grid">
+        <div class="export-fmt-card" onclick="doBackup()">
+          <div class="export-fmt-icon">💾</div>
+          <div class="export-fmt-name">สำรองข้อมูล</div>
+          <div class="export-fmt-sub">บันทึกไฟล์ .json<br>ทุกรายการ + กระเป๋า</div>
+        </div>
+        <div class="export-fmt-card" onclick="doRestore()">
+          <div class="export-fmt-icon">📂</div>
+          <div class="export-fmt-name">กู้คืนข้อมูล</div>
+          <div class="export-fmt-sub">นำเข้าจากไฟล์ .json<br>ที่สำรองไว้</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--fg-muted);margin-top:8px" id="backup-last-lbl"></div>
+    </div>`;
+}
+
+function setExportScope(s) {
+  exportScope = s;
+  document.querySelectorAll('.export-scope-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const rangeWrap = document.getElementById('exp-range-wrap');
+  if (rangeWrap) rangeWrap.style.display = (s==='range')?'flex':'none';
+  refreshExportPreview();
+}
+
+function refreshExportPreview() {
+  const el = document.getElementById('exp-count');
+  if (el) el.textContent = getExportTxns().length + ' รายการ';
+}
+
+function toggleExportCol(i) {
+  EXPORT_COLS[i].on = !EXPORT_COLS[i].on;
+  const chips = document.querySelectorAll('.export-col-chip');
+  chips[i]?.classList.toggle('on', EXPORT_COLS[i].on);
+  chips[i]?.querySelector('.export-col-chip-dot')?.setAttribute('style','');
+}
+
+function buildExportRows() {
+  const txns  = getExportTxns();
+  const cols   = EXPORT_COLS.filter(c=>c.on);
+  const header = cols.map(c=>c.label);
+  // Build running balance per wallet
+  const balMap = {};
+  store.wallets.forEach(w => { balMap[w.id] = w.balance; });
+  // Walk transactions in reverse to reconstruct running balance
+  const allSorted = [...store.txns].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const txBalMap  = {};
+  allSorted.forEach(tx => {
+    txBalMap[tx.id] = (balMap[tx.wallet]||0);
+    if (tx.type==='income')  balMap[tx.wallet] = (balMap[tx.wallet]||0) - tx.amount;
+    else                     balMap[tx.wallet] = (balMap[tx.wallet]||0) + tx.amount;
+  });
+  const rows = txns.map(tx => {
+    const w = walletById(tx.wallet);
+    return cols.map(c => {
+      switch(c.key){
+        case 'date':    return tx.date;
+        case 'type':    return tx.type==='income'?'รายรับ':'รายจ่าย';
+        case 'amount':  return tx.type==='income'?tx.amount:-tx.amount;
+        case 'cat':     return tx.cat;
+        case 'wallet':  return w?w.name:tx.wallet;
+        case 'desc':    return tx.desc||'';
+        case 'method':  return METHOD_LABEL[tx.method]||tx.method;
+        case 'balance': return txBalMap[tx.id]??'';
+        default:        return '';
+      }
+    });
+  });
+  return { header, rows, txns };
+}
+
+function csvEscape(v) {
+  const s = String(v??'');
+  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+    ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+async function doExport(fmt) {
+  const { header, rows, txns } = buildExportRows();
+  if (!txns.length) { alert('ไม่มีรายการในช่วงที่เลือก'); return; }
+  const dateLabel = new Date().toISOString().slice(0,10);
+  closeOverlay('export-overlay');
+  if (fmt === 'csv') {
+    const BOM = '﻿'; // UTF-8 BOM for Excel Thai support
+    const lines = [header, ...rows].map(r => r.map(csvEscape).join(','));
+    const blob = new Blob([BOM + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    await downloadBlob(blob, `FinFlow_${dateLabel}.csv`);
+  } else {
+    // SpreadsheetML XML — Excel opens this as .xlsx (shows a compatibility prompt)
+    const xl = buildXls(header, rows, txns);
+    const blob = new Blob(['﻿'+xl], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8'});
+    await downloadBlob(blob, `FinFlow_${dateLabel}.xlsx`);
+  }
+}
+
+function buildXls(header, rows, txns) {
+  const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const cellNum = v => `<Cell><Data ss:Type="Number">${v}</Data></Cell>`;
+  const cellStr = v => `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+  const cell    = v => (typeof v==='number') ? cellNum(v) : cellStr(v);
+  const hdrRow  = header.map(h=>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('');
+  const dataRows= rows.map(r=>`<Row>${r.map(cell).join('')}</Row>`).join('\n');
+
+  // Summary sheet data
+  const { income, expense } = monthSums(viewYear, viewMonth);
+  const walletRows = store.wallets.map(w=>{
+    const bi = BANK_INFO[w.bankCode]||BANK_INFO.other;
+    return `<Row>${cellStr(w.name)}${cellStr(bi.name)}${cellStr(w.type==='cash'?'เงินสด':w.type==='bank'?'ธนาคาร':'E-Wallet')}${cellNum(w.balance)}</Row>`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:x="urn:schemas-microsoft-com:office:excel">
+  <Styles>
+    <Style ss:ID="hdr">
+      <Font ss:Bold="1"/>
+      <Interior ss:Color="#4F46E5" ss:Pattern="Solid"/>
+      <Font ss:Color="#FFFFFF" ss:Bold="1"/>
+    </Style>
+    <Style ss:ID="amt">
+      <NumberFormat ss:Format="#,##0.00"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="รายการ">
+    <Table>
+      <Row>${hdrRow}</Row>
+      ${dataRows}
+    </Table>
+  </Worksheet>
+  <Worksheet ss:Name="กระเป๋าเงิน">
+    <Table>
+      <Row>
+        ${['ชื่อกระเป๋า','ธนาคาร','ประเภท','ยอดคงเหลือ'].map(h=>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('')}
+      </Row>
+      ${walletRows}
+    </Table>
+  </Worksheet>
+  <Worksheet ss:Name="สรุปเดือน">
+    <Table>
+      <Row><Cell ss:StyleID="hdr"><Data ss:Type="String">รายการ</Data></Cell><Cell ss:StyleID="hdr"><Data ss:Type="String">จำนวนเงิน (฿)</Data></Cell></Row>
+      <Row>${cellStr('รายรับทั้งหมด')}${cellNum(income)}</Row>
+      <Row>${cellStr('รายจ่ายทั้งหมด')}${cellNum(expense)}</Row>
+      <Row>${cellStr('คงเหลือสุทธิ')}${cellNum(income-expense)}</Row>
+      <Row>${cellStr('ยอดรวมทุกกระเป๋า')}${cellNum(totalBalance())}</Row>
+    </Table>
+  </Worksheet>
+</Workbook>`;
+}
+
+// ── Backup / Restore (JSON full snapshot) ───────────────
+async function doBackup() {
+  const data = JSON.stringify(store, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const dateLabel = new Date().toISOString().slice(0,10);
+  await downloadBlob(blob, `FinFlow_backup_${dateLabel}.json`);
+  try { localStorage.setItem('finflow_last_backup', Date.now().toString()); } catch(e) {}
+  const lbl = document.getElementById('backup-last-lbl');
+  if (lbl) lbl.textContent = '✅ สำรองข้อมูลล่าสุด: วันนี้';
+}
+
+function doRestore() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data.wallets) || !Array.isArray(data.txns))
+        throw new Error('ไฟล์ไม่ถูกต้อง — ไม่พบข้อมูล wallets / txns');
+      store = data;
+      saveStore();
+      closeOverlay('export-overlay');
+      setTimeout(renderAll, 300);
+      setTimeout(() => alert(`✅ กู้คืนข้อมูลสำเร็จ\n${data.txns.length} รายการ · ${data.wallets.length} กระเป๋า`), 400);
+    } catch(err) {
+      alert('❌ กู้คืนไม่ได้: ' + (err.message || err));
+    }
+  };
+  document.body.appendChild(input);
+  input.click();
+  document.body.removeChild(input);
+}
+
+// Resolve the downloads capability once; null = unavailable (hide UI)
+let _dlCap = null;
+(async () => {
+  try { _dlCap = await claude.use('downloads'); } catch(e) {}
+})();
+
+async function downloadBlob(blob, filename) {
+  if (!_dlCap) {
+    // Fallback: object-URL download (works in non-artifact contexts)
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return;
+  }
+  try {
+    await _dlCap.save({ filename, data: blob });
+  } catch(err) {
+    if (err?.code === 'declined') return; // user said no — silent
+    if (err?.code === 'rate_limited') {
+      setTimeout(() => _dlCap.save({ filename, data: blob }), 1500);
+      return;
+    }
+    alert('ไม่สามารถดาวน์โหลดได้: ' + (err?.message || err));
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  WALLET MANAGEMENT CRUD
+// ═══════════════════════════════════════════════════════
+
+// ── Wallet-edit state ────────────────────────────────
+let wmEditId   = null;   // null = add mode, else walletId being edited
+let wmBankCode = 'cash'; // selected bank in form
+let wmWtype    = 'cash'; // selected wtype tab
+
+// ── Wallet type summary bar ───────────────────────────
+function renderWalletTypeSummary() {
+  const types = [
+    { key:'cash',    label:'เงินสด',   icon:'💵', c:'var(--cash-c)' },
+    { key:'bank',    label:'ธนาคาร',   icon:'🏦', c:'var(--bank-c)' },
+    { key:'ewallet', label:'E-Wallet', icon:'📱', c:'var(--ew-c)'  },
+  ];
+  const el = document.getElementById('wtype-summary');
+  el.innerHTML = types.map(t => {
+    const total = store.wallets.filter(w=>w.type===t.key).reduce((s,w)=>s+w.balance,0);
+    return `<div class="wtype-sum-item">
+      <div class="wtype-sum-label">${t.icon} ${t.label}</div>
+      <div class="wtype-sum-bal" style="color:${t.c}">${baht(total)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Wallet reorder ────────────────────────────────────
+function moveWallet(wid, dir) {
+  const idx = store.wallets.findIndex(w => w.id === wid);
+  if (idx < 0) return;
+  const target = idx + dir;
+  if (target < 0 || target >= store.wallets.length) return;
+  [store.wallets[idx], store.wallets[target]] = [store.wallets[target], store.wallets[idx]];
+  saveStore();
+  renderWalletMgmtBody();
+  renderAll();
+}
+
+function openWalletMgmt() {
+  renderWalletMgmtBody();
+  openOverlay('wallet-mgmt-overlay');
+}
+
+function renderWalletMgmtBody() {
+  const body = document.getElementById('wallet-mgmt-body');
+  const listHtml = store.wallets.map((w, idx) => {
+    const bi = BANK_INFO[w.bankCode] || BANK_INFO.other;
+    const isFirst = idx === 0;
+    const isLast  = idx === store.wallets.length - 1;
+    return `<div class="wm-item">
+      <div class="wm-item-icon" style="background:${bi.s};color:${bi.c}">${w.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="wm-item-name">${w.name}</div>
+        <div class="wm-item-sub">${bi.name} · ${baht(w.balance)}</div>
+      </div>
+      <div class="wm-order-btns">
+        <button class="wm-order-btn" onclick="moveWallet('${w.id}',-1)" ${isFirst?'disabled':''} title="ขึ้น">▲</button>
+        <button class="wm-order-btn" onclick="moveWallet('${w.id}',1)"  ${isLast?'disabled':''}  title="ลง">▼</button>
+      </div>
+      <button class="wm-edit-btn" onclick="openWalletEdit('${w.id}')" title="แก้ไข" style="margin-left:4px">✏️</button>
+    </div>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="wm-list">${listHtml}</div>
+    <button class="wm-add-btn" onclick="openWalletAdd()">＋ เพิ่มกระเป๋าเงินใหม่</button>`;
+}
+
+// ── Transfer between wallets ──────────────────────────
+function openTransfer() {
+  renderTransferBody();
+  openOverlay('transfer-overlay');
+}
+
+function renderTransferBody() {
+  const body = document.getElementById('transfer-body');
+  if (store.wallets.length < 2) {
+    body.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--fg-muted);font-size:13px">
+      ต้องมีกระเป๋าเงินอย่างน้อย 2 ใบ<br>เพื่อโอนเงินระหว่างกัน</div>`;
+    return;
+  }
+  const optHtml = store.wallets.map(w => {
+    const bi = BANK_INFO[w.bankCode]||BANK_INFO.other;
+    return `<option value="${w.id}">${w.icon} ${w.name} (${baht(w.balance)})</option>`;
+  }).join('');
+  // Default: first wallet → second wallet
+  const w0 = store.wallets[0];
+  const w1 = store.wallets[1];
+  const bi0 = BANK_INFO[w0.bankCode]||BANK_INFO.other;
+  const bi1 = BANK_INFO[w1.bankCode]||BANK_INFO.other;
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="transfer-wallet-row">
+        <div class="transfer-wallet-sel">
+          <div style="width:36px;height:36px;border-radius:10px;background:${bi0.s};color:${bi0.c};
+            display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0"
+            id="tr-from-icon">${w0.icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:10px;font-weight:700;color:var(--fg-muted);margin-bottom:4px;letter-spacing:.06em">จาก</div>
+            <select id="tr-from" onchange="updateTransferIcons()"
+              style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+              background:var(--surface);font-family:inherit;font-size:14px;color:var(--fg);">
+              ${optHtml}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="transfer-arrow">⬇️</div>
+
+      <div class="transfer-wallet-row">
+        <div class="transfer-wallet-sel">
+          <div style="width:36px;height:36px;border-radius:10px;background:${bi1.s};color:${bi1.c};
+            display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0"
+            id="tr-to-icon">${w1.icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:10px;font-weight:700;color:var(--fg-muted);margin-bottom:4px;letter-spacing:.06em">ถึง</div>
+            <select id="tr-to" onchange="updateTransferIcons()"
+              style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+              background:var(--surface);font-family:inherit;font-size:14px;color:var(--fg);">
+              ${store.wallets.map((w,i)=>`<option value="${w.id}" ${i===1?'selected':''}>${w.icon} ${w.name} (${baht(w.balance)})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">จำนวนเงิน (฿)</label>
+        <div style="position:relative;">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--fg-muted);font-size:16px">฿</span>
+          <input id="tr-amount" type="number" min="0.01" step="0.01" placeholder="0.00"
+            style="width:100%;padding:11px 12px 11px 28px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+            background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--fg);box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">หมายเหตุ (ไม่บังคับ)</label>
+        <input id="tr-desc" type="text" placeholder="เช่น ค่าใช้จ่ายประจำ, เติมเงิน..."
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg);box-sizing:border-box;">
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">วันที่</label>
+        <input id="tr-date" type="date" value="${new Date().toISOString().slice(0,10)}"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg);box-sizing:border-box;">
+      </div>
+
+      <button onclick="saveTransfer()" style="
+        width:100%;padding:13px;border:none;border-radius:var(--rad);
+        background:var(--accent);color:#fff;font-family:inherit;
+        font-size:15px;font-weight:700;cursor:pointer;">
+        🔄 โอนเงิน
+      </button>
+    </div>`;
+}
+
+function updateTransferIcons() {
+  const fromId = document.getElementById('tr-from').value;
+  const toId   = document.getElementById('tr-to').value;
+  const wf = walletById(fromId);
+  const wt = walletById(toId);
+  if (wf) {
+    const bf = BANK_INFO[wf.bankCode]||BANK_INFO.other;
+    const el = document.getElementById('tr-from-icon');
+    if (el) { el.textContent=wf.icon; el.style.background=bf.s; el.style.color=bf.c; }
+  }
+  if (wt) {
+    const bt = BANK_INFO[wt.bankCode]||BANK_INFO.other;
+    const el = document.getElementById('tr-to-icon');
+    if (el) { el.textContent=wt.icon; el.style.background=bt.s; el.style.color=bt.c; }
+  }
+}
+
+function saveTransfer() {
+  const fromId = document.getElementById('tr-from').value;
+  const toId   = document.getElementById('tr-to').value;
+  if (fromId === toId) {
+    alert('กรุณาเลือกกระเป๋าเงินต้นทางและปลายทางให้ต่างกัน'); return;
+  }
+  const amount = parseFloat(document.getElementById('tr-amount').value);
+  if (!amount || amount <= 0) {
+    const inp = document.getElementById('tr-amount');
+    inp.focus(); inp.style.borderColor='var(--expense)';
+    setTimeout(()=>inp.style.borderColor='',1400); return;
+  }
+  const desc = (document.getElementById('tr-desc').value||'').trim();
+  const date = document.getElementById('tr-date').value||new Date().toISOString().slice(0,10);
+  const wFrom = walletById(fromId);
+  const wTo   = walletById(toId);
+  const label = desc || `โอน: ${wFrom.name} → ${wTo.name}`;
+  const now = Date.now();
+
+  // Expense from source
+  store.txns.push({id:now,   date, type:'expense', amount, cat:'โอนเงิน', wallet:fromId, desc:label, method:'transfer'});
+  // Income to dest
+  store.txns.push({id:now+1, date, type:'income',  amount, cat:'โอนเงิน', wallet:toId,   desc:label, method:'transfer'});
+
+  wFrom.balance -= amount;
+  wTo.balance   += amount;
+
+  saveStore();
+  closeOverlay('transfer-overlay');
+  setTimeout(renderAll, 300);
+}
+
+function openWalletAdd() {
+  wmEditId   = null;
+  wmWtype    = 'cash';
+  wmBankCode = 'cash';
+  document.getElementById('wallet-edit-title').textContent = 'เพิ่มกระเป๋าเงิน';
+  renderWalletEditForm(null, true);
+  openOverlay('wallet-edit-overlay');
+}
+
+function openWalletEdit(wid) {
+  const w = walletById(wid); if (!w) return;
+  wmEditId   = wid;
+  wmWtype    = w.type    || 'cash';
+  wmBankCode = w.bankCode || 'cash';
+  document.getElementById('wallet-edit-title').textContent = 'แก้ไขกระเป๋าเงิน';
+  renderWalletEditForm(w, false);
+  openOverlay('wallet-edit-overlay');
+}
+
+function renderWalletEditForm(w, isNew) {
+  const body = document.getElementById('wallet-edit-body');
+  const bankList = BANK_TYPE_LIST[wmWtype] || ['other'];
+  const bankPickerHtml = bankList.map(code => {
+    const bi = BANK_INFO[code];
+    const sel = (code === wmBankCode) ? ' sel' : '';
+    return `<div class="bank-chip${sel}" onclick="selectBankCode('${code}')">
+      <div class="bank-chip-badge" style="background:${bi.c}">${bi.abbr}</div>
+      <div class="bank-chip-name">${bi.name}</div>
+    </div>`;
+  }).join('');
+
+  const hasTxns = w ? store.txns.some(t => t.wallet === w.id) : false;
+  const numTxns = w ? store.txns.filter(t => t.wallet === w.id).length : 0;
+
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ชื่อกระเป๋า</label>
+        <input id="wm-name" type="text" value="${w ? w.name : ''}" placeholder="เช่น บัญชีเงินเดือน"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg);box-sizing:border-box;">
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ประเภท</label>
+        <div class="wtype-tabs">
+          <button class="wtype-tab${wmWtype==='cash'?' active':''}" onclick="selectWtype('cash')">💵 เงินสด</button>
+          <button class="wtype-tab${wmWtype==='bank'?' active':''}" onclick="selectWtype('bank')">🏦 ธนาคาร</button>
+          <button class="wtype-tab${wmWtype==='ewallet'?' active':''}" onclick="selectWtype('ewallet')">📱 E-Wallet</button>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">เลือกธนาคาร / ประเภท</label>
+        <div class="bank-picker" id="wm-bank-picker">${bankPickerHtml}</div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">เลขที่บัญชี (ไม่บังคับ)</label>
+        <input id="wm-acct" type="text" value="${w ? (w.acctNo||'') : ''}" placeholder="xxx-x-xxxxx-x"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
+      </div>
+
+      ${isNew ? `<div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ยอดเงินเริ่มต้น (฿)</label>
+        <input id="wm-balance" type="number" value="0" min="0" step="0.01" placeholder="0.00"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
+      </div>` : ''}
+
+      <button onclick="saveWallet(${isNew})" style="
+        width:100%;padding:13px;border:none;border-radius:var(--rad);
+        background:var(--accent);color:#fff;font-family:inherit;
+        font-size:15px;font-weight:700;cursor:pointer;">
+        ${isNew ? '✅ เพิ่มกระเป๋าเงิน' : '💾 บันทึกการเปลี่ยนแปลง'}
+      </button>
+
+      ${!isNew ? `<div class="wm-danger-zone">
+        <button class="wm-delete-btn" onclick="confirmDeleteWallet('${w.id}')"
+          ${hasTxns?'disabled':''}>🗑 ลบกระเป๋าเงินนี้</button>
+        ${hasTxns ? `<div class="wm-hint">ไม่สามารถลบได้ — มี ${numTxns} รายการในกระเป๋านี้</div>` : ''}
+      </div>` : ''}
+    </div>`;
+}
+
+function selectWtype(t) {
+  wmWtype = t;
+  // Auto-select first bank of this type
+  const list = BANK_TYPE_LIST[t] || ['other'];
+  wmBankCode = list[0];
+  renderWalletEditForm(wmEditId ? walletById(wmEditId) : null, wmEditId === null);
+}
+
+function selectBankCode(code) {
+  wmBankCode = code;
+  // Re-render picker selection only
+  document.querySelectorAll('#wm-bank-picker .bank-chip').forEach(el => {
+    const c = el.getAttribute('onclick').match(/'(\w+)'/)[1];
+    el.classList.toggle('sel', c === code);
+  });
+}
+
+function saveWallet(isNew) {
+  const name = (document.getElementById('wm-name').value||'').trim();
+  if (!name) {
+    const inp = document.getElementById('wm-name');
+    inp.focus(); inp.style.borderColor='var(--expense)';
+    setTimeout(()=>inp.style.borderColor='',1400); return;
+  }
+  const bi = BANK_INFO[wmBankCode] || BANK_INFO.other;
+  const acctNo = (document.getElementById('wm-acct').value||'').trim();
+
+  if (isNew) {
+    const bal = parseFloat(document.getElementById('wm-balance').value)||0;
+    const id  = 'w_'+(Date.now());
+    store.wallets.push({
+      id, name, type: wmWtype, bankCode: wmBankCode,
+      icon: bi.icon, balance: bal, acctNo,
+    });
+  } else {
+    const w = walletById(wmEditId); if (!w) return;
+    w.name     = name;
+    w.type     = wmWtype;
+    w.bankCode = wmBankCode;
+    w.icon     = bi.icon;
+    w.acctNo   = acctNo;
+  }
+
+  saveStore();
+  closeOverlay('wallet-edit-overlay');
+  // Refresh mgmt list then full render
+  setTimeout(() => {
+    renderWalletMgmtBody();
+    renderAll();
+  }, 280);
+}
+
+function confirmDeleteWallet(wid) {
+  const w = walletById(wid); if (!w) return;
+  const hasTxns = store.txns.some(t => t.wallet === wid);
+  if (hasTxns) return; // button should already be disabled
+  if (!confirm(`ลบ "${w.name}" ออกจากกระเป๋าเงิน?\n\nการลบนี้ไม่สามารถย้อนกลับได้`)) return;
+  store.wallets = store.wallets.filter(x => x.id !== wid);
+  saveStore();
+  closeOverlay('wallet-edit-overlay');
+  setTimeout(() => { renderWalletMgmtBody(); renderAll(); }, 280);
+}
+</script>
+
+<!-- Service Worker Registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[FinFlow SW] registered:', reg.scope))
+      .catch(err => console.warn('[FinFlow SW] failed:', err));
+  });
+}
+</script>
+</body>
+</html>
