@@ -805,7 +805,7 @@ body{
 
 <div id="app">
   <header class="topbar">
-    <span class="app-name">FinFlow</span>
+    <span class="app-name">FinFlow</span><span id="app-version-chip" style="font-size:9px;padding:1px 6px;border-radius:6px;background:var(--accent-s);color:var(--accent);font-weight:700;margin-left:4px;vertical-align:middle;letter-spacing:.2px"></span>
     <div class="month-nav">
       <button class="mnav-btn" id="prev-month">&#8249;</button>
       <span class="month-lbl" id="month-lbl"></span>
@@ -1040,7 +1040,10 @@ body{
   font-family:Sarabun,sans-serif">
   <div style="text-align:center;margin-bottom:32px">
     <div style="font-size:52px;margin-bottom:10px">💰</div>
-    <div style="font-size:22px;font-weight:700;color:var(--fg)">FinFlow</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:7px">
+      <span style="font-size:22px;font-weight:700;color:var(--fg)">FinFlow</span>
+      <span id="lock-version" style="font-size:10px;padding:2px 7px;border-radius:7px;background:var(--accent-s);color:var(--accent);font-weight:700"></span>
+    </div>
     <div style="font-size:13px;color:var(--fg-muted);margin-top:6px" id="lock-msg">ใส่ PIN เพื่อเข้าใช้งาน</div>
   </div>
   <!-- PIN dots indicator -->
@@ -1220,6 +1223,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
+const APP_VERSION = 'v13';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1758,6 +1762,8 @@ function renderAll() {
 
 function renderHeader() {
   document.getElementById('month-lbl').textContent = `${TH_MONTHS[viewMonth]} ${viewYear+543}`;
+  const vc = document.getElementById('app-version-chip');
+  if (vc) vc.textContent = APP_VERSION;
 }
 
 function renderBalance() {
@@ -2598,6 +2604,9 @@ function renderExportBody() {
         🗑️ รีเซ็ตข้อมูลทั้งหมด
       </button>
       <div style="font-size:11px;color:var(--fg-muted);margin-top:6px;text-align:center">ลบรายการและยอดเงินทั้งหมด กลับสู่ค่าเริ่มต้น</div>
+    </div>
+    <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--fg-muted)">
+      FinFlow <span style="padding:1px 6px;border-radius:6px;background:var(--accent-s);color:var(--accent);font-weight:700">${APP_VERSION}</span>
     </div>`;
 }
 
@@ -3747,6 +3756,9 @@ function hasPinSet()    { return !!getPinStored(); }
 let _lockBuf = '';
 
 function initLockScreen() {
+  // Always show version chip on lock screen
+  const lv = document.getElementById('lock-version');
+  if (lv) lv.textContent = APP_VERSION;
   if (!hasPinSet()) return;
   _lockBuf = '';
   const ls = document.getElementById('lock-screen');
