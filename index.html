@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#4F46E5">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="FinFlow">
-<link rel="manifest" href="./manifest.json">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#4F46E5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FinFlow">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
 <title>FinFlow</title>
@@ -1223,7 +1224,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -3104,7 +3105,14 @@ function renderWalletEditForm(w, isNew) {
         <input id="wm-balance" type="number" value="0" min="0" step="0.01" placeholder="0.00"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
-      </div>` : ''}
+      </div>` : `<div>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ปรับยอดเงิน (฿)</label>
+        <div style="font-size:11px;color:var(--fg-muted);margin-bottom:6px">ยอดปัจจุบัน: <span style="font-weight:700;color:var(--fg);font-family:'IBM Plex Mono',monospace">${baht(w.balance)}</span> — ใส่ยอดที่ถูกต้องเพื่อแก้ไข</div>
+        <input id="wm-balance" type="number" value="${w.balance}" step="0.01" placeholder="${w.balance}"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+          background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
+        <div style="font-size:11px;color:var(--fg-muted);margin-top:4px">⚠️ การปรับยอดนี้จะแก้ไขตรงๆ ไม่สร้างรายการธุรกรรม</div>
+      </div>`}
 
       <button onclick="saveWallet(${isNew})" style="
         width:100%;padding:13px;border:none;border-radius:var(--rad);
@@ -3162,6 +3170,8 @@ function saveWallet(isNew) {
     w.bankCode = wmBankCode;
     w.icon     = bi.icon;
     w.acctNo   = acctNo;
+    const newBal = parseFloat(document.getElementById('wm-balance').value);
+    if (!isNaN(newBal)) w.balance = newBal;
   }
 
   saveStore();
@@ -4203,9 +4213,14 @@ function markDebtPaid(id) {
 }
 </script>
 
-<!-- SW -->
 <script>
-if("serviceWorker"in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").then(r=>console.log("SW:",r.scope)).catch(e=>console.error("SW err:",e)));}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(r=>console.log('[SW] registered',r.scope))
+      .catch(e=>console.warn('[SW] failed',e));
+  });
+}
 </script>
 </body>
 </html>
