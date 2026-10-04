@@ -755,6 +755,35 @@ body{
 .wtype-sum-label{font-size:9px;font-weight:700;color:var(--fg-muted);letter-spacing:.06em;text-transform:uppercase;}
 .wtype-sum-bal{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
 
+/* ── Wallet groups (accordion) ───────────────────── */
+.wgroup{margin-bottom:8px;border-radius:var(--rad);overflow:hidden;box-shadow:var(--sh);}
+.wgroup-bar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad);padding:11px 14px;cursor:pointer;
+  user-select:none;transition:background .12s;
+}
+.wgroup-bar:active{background:var(--surface2);}
+.wgroup-ico{
+  width:36px;height:36px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;font-size:18px;flex-shrink:0;
+}
+.wgroup-info{flex:1;min-width:0;}
+.wgroup-label{font-size:12px;font-weight:700;color:var(--fg2);}
+.wgroup-meta{font-size:11px;color:var(--fg-muted);margin-top:1px;}
+.wgroup-right{display:flex;align-items:center;gap:8px;}
+.wgroup-bal{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;color:var(--fg);}
+.wgroup-chevron{font-size:13px;color:var(--fg-muted);transition:transform .2s;line-height:1;}
+.wgroup-chevron.open{transform:rotate(180deg);}
+.wgroup-cards{
+  display:none;padding:0 10px 10px;
+  background:var(--surface2);
+  border:1px solid var(--border);border-top:none;
+  border-radius:0 0 var(--rad) var(--rad);
+}
+.wgroup-cards.open{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px;}
+.wgroup-empty{padding:14px;text-align:center;font-size:12px;color:var(--fg-muted);}
+
 /* ── Transfer overlay ────────────────────────────── */
 .transfer-arrow{
   display:flex;align-items:center;justify-content:center;
@@ -853,7 +882,7 @@ body{
           <button class="text-btn" onclick="openWalletMgmt()" style="font-size:13px">⚙️ จัดการ</button>
         </div>
       </div>
-      <div class="wallet-grid" id="wallet-grid"></div>
+      <div id="wallet-groups"></div>
       <div class="wtype-summary" id="wtype-summary"></div>
     </div>
 
@@ -1224,7 +1253,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1774,13 +1803,57 @@ function renderBalance() {
   document.getElementById('month-expense').textContent = '-'+baht(expense);
 }
 
+// Wallet group open state (persists across renders)
+const _wgOpen = { cash: true, bank: true, ewallet: true };
+
+function toggleWalletGroup(type) {
+  _wgOpen[type] = !_wgOpen[type];
+  const bar      = document.getElementById('wg-bar-'   + type);
+  const cards    = document.getElementById('wg-cards-' + type);
+  const chevron  = document.getElementById('wg-chev-'  + type);
+  if (!cards) return;
+  cards.classList.toggle('open', _wgOpen[type]);
+  if (chevron) chevron.classList.toggle('open', _wgOpen[type]);
+}
+
 function renderWallets() {
-  document.getElementById('wallet-grid').innerHTML = store.wallets.map(w => {
-    const wc = walletColor(w);
-    return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
-      <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
-      <div class="wcard-name">${w.name}</div>
-      <div class="wcard-bal">${baht(w.balance)}</div>
+  const GROUPS = [
+    { type:'cash',    label:'เงินสด',   ico:'💵', c:'var(--cash-c)',  s:'var(--cash-s)'  },
+    { type:'bank',    label:'ธนาคาร',   ico:'🏦', c:'var(--bank-c)',  s:'var(--bank-s)'  },
+    { type:'ewallet', label:'E-Wallet', ico:'📱', c:'var(--ew-c)',    s:'var(--ew-s)'    },
+  ];
+  const container = document.getElementById('wallet-groups');
+  if (!container) return;
+
+  container.innerHTML = GROUPS.map(g => {
+    const wallets = store.wallets.filter(w => (w.type||'cash') === g.type);
+    const total   = wallets.reduce((s,w) => s + w.balance, 0);
+    const isOpen  = _wgOpen[g.type];
+
+    const cardsHtml = wallets.length
+      ? wallets.map(w => {
+          const wc = walletColor(w);
+          return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
+            <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
+            <div class="wcard-name">${w.name}</div>
+            <div class="wcard-bal">${baht(w.balance)}</div>
+          </div>`;
+        }).join('')
+      : `<div class="wgroup-empty">ยังไม่มีบัญชีในกลุ่มนี้</div>`;
+
+    return `<div class="wgroup">
+      <div class="wgroup-bar" id="wg-bar-${g.type}" onclick="toggleWalletGroup('${g.type}')">
+        <div class="wgroup-ico" style="background:${g.s};color:${g.c}">${g.ico}</div>
+        <div class="wgroup-info">
+          <div class="wgroup-label">${g.label}</div>
+          <div class="wgroup-meta">${wallets.length} บัญชี</div>
+        </div>
+        <div class="wgroup-right">
+          <div class="wgroup-bal">${baht(total)}</div>
+          <div class="wgroup-chevron${isOpen?' open':''}" id="wg-chev-${g.type}">▼</div>
+        </div>
+      </div>
+      <div class="wgroup-cards${isOpen?' open':''}" id="wg-cards-${g.type}">${cardsHtml}</div>
     </div>`;
   }).join('');
 }
