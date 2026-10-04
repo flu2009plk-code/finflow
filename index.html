@@ -36,6 +36,8 @@
   --bank-s:    #DBEAFE;
   --ew-c:      #6D28D9;
   --ew-s:      #EDE9FE;
+  --cc-c:      #B91C1C;
+  --cc-s:      #FEE2E2;
   --sh:        0 1px 3px rgba(0,0,0,.07),0 2px 8px rgba(0,0,0,.05);
   --sh-lg:     0 8px 32px rgba(0,0,0,.13);
   --rad:       14px;
@@ -51,6 +53,7 @@
     --cash-c:#FCD34D; --cash-s:#1C1204;
     --bank-c:#60A5FA; --bank-s:#0C1A3A;
     --ew-c:#A78BFA; --ew-s:#1C1040;
+    --cc-c:#F87171; --cc-s:#450A0A;
     --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
     --sh-lg:0 8px 32px rgba(0,0,0,.6);
     color-scheme:dark;
@@ -65,6 +68,7 @@
   --cash-c:#FCD34D; --cash-s:#1C1204;
   --bank-c:#60A5FA; --bank-s:#0C1A3A;
   --ew-c:#A78BFA; --ew-s:#1C1040;
+  --cc-c:#F87171; --cc-s:#450A0A;
   --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
   --sh-lg:0 8px 32px rgba(0,0,0,.6);
   color-scheme:dark;
@@ -1253,7 +1257,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1292,6 +1296,7 @@ const WALLET_COLORS = {
   cash:   {c:'var(--cash-c)',  s:'var(--cash-s)'},
   bank:   {c:'var(--bank-c)', s:'var(--bank-s)'},
   ewallet:{c:'var(--ew-c)',   s:'var(--ew-s)'},
+  credit: {c:'var(--cc-c)',   s:'var(--cc-s)'},
 };
 
 // Bank-specific colors and metadata
@@ -1311,12 +1316,24 @@ const BANK_INFO = {
   shopeepay: { abbr:'Shopee', name:'ShopeePay',      type:'ewallet', icon:'📱', c:'#C2410C', s:'#FFF7ED' },
   cash:      { abbr:'CASH',   name:'เงินสด',         type:'cash',    icon:'💵', c:'#B45309', s:'#FEF3C7' },
   other:     { abbr:'OTHER',  name:'อื่นๆ',          type:'bank',    icon:'💳', c:'#6B7280', s:'#F3F4F6' },
+  // Credit cards
+  ktc:       { abbr:'KTC',    name:'KTC',            type:'credit',  icon:'💳', c:'#1565C0', s:'#DBEAFE' },
+  kbankcc:   { abbr:'KBank',  name:'KBank Visa',     type:'credit',  icon:'💳', c:'#1B7F3E', s:'#DCFCE7' },
+  scbcc:     { abbr:'SCB',    name:'SCB Credit',     type:'credit',  icon:'💳', c:'#6B21A8', s:'#F3E8FF' },
+  baycc:     { abbr:'BAY',    name:'กรุงศรี Visa',   type:'credit',  icon:'💳', c:'#B45309', s:'#FEF3C7' },
+  bblcc:     { abbr:'BBL',    name:'BBL Credit',     type:'credit',  icon:'💳', c:'#1E3A5F', s:'#DBEAFE' },
+  ttbcc:     { abbr:'TTB',    name:'TTB Credit',     type:'credit',  icon:'💳', c:'#1E40AF', s:'#EFF6FF' },
+  uobcc:     { abbr:'UOB',    name:'UOB Credit',     type:'credit',  icon:'💳', c:'#7C3AED', s:'#EDE9FE' },
+  aeon:      { abbr:'AEON',   name:'AEON',           type:'credit',  icon:'💳', c:'#9B1C1C', s:'#FEE2E2' },
+  citi:      { abbr:'Citi',   name:'Citi/Krungsri',  type:'credit',  icon:'💳', c:'#1D4ED8', s:'#DBEAFE' },
+  othercc:   { abbr:'อื่นๆ',  name:'บัตรอื่นๆ',     type:'credit',  icon:'💳', c:'#6B7280', s:'#F3F4F6' },
 };
 
 const BANK_TYPE_LIST = {
   cash:    ['cash'],
   bank:    ['kbank','ktb','scb','bbl','bay','gsb','ttb','uob','cimb','other'],
   ewallet: ['tmw','promptpay','rabbit','shopeepay'],
+  credit:  ['ktc','kbankcc','scbcc','baycc','bblcc','ttbcc','uobcc','aeon','citi','othercc'],
 };
 
 const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
@@ -1804,7 +1821,7 @@ function renderBalance() {
 }
 
 // Wallet group open state (persists across renders)
-const _wgOpen = { cash: true, bank: true, ewallet: true };
+const _wgOpen = { cash: true, bank: true, ewallet: true, credit: true };
 
 function toggleWalletGroup(type) {
   _wgOpen[type] = !_wgOpen[type];
@@ -1816,23 +1833,50 @@ function toggleWalletGroup(type) {
   if (chevron) chevron.classList.toggle('open', _wgOpen[type]);
 }
 
+// Helper: days until a monthly date (1-31) from today
+function daysUntilMonthDay(day) {
+  if (!day) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let d = new Date(today.getFullYear(), today.getMonth(), day);
+  if (d <= today) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+  return Math.round((d - today) / 86400000);
+}
+
 function renderWallets() {
   const GROUPS = [
-    { type:'cash',    label:'เงินสด',   ico:'💵', c:'var(--cash-c)',  s:'var(--cash-s)'  },
-    { type:'bank',    label:'ธนาคาร',   ico:'🏦', c:'var(--bank-c)',  s:'var(--bank-s)'  },
-    { type:'ewallet', label:'E-Wallet', ico:'📱', c:'var(--ew-c)',    s:'var(--ew-s)'    },
+    { type:'cash',    label:'เงินสด',       ico:'💵', c:'var(--cash-c)',  s:'var(--cash-s)'  },
+    { type:'bank',    label:'ธนาคาร',       ico:'🏦', c:'var(--bank-c)',  s:'var(--bank-s)'  },
+    { type:'ewallet', label:'E-Wallet',     ico:'📱', c:'var(--ew-c)',    s:'var(--ew-s)'    },
+    { type:'credit',  label:'บัตรเครดิต',  ico:'💳', c:'var(--cc-c)',    s:'var(--cc-s)'    },
   ];
   const container = document.getElementById('wallet-groups');
   if (!container) return;
 
   container.innerHTML = GROUPS.map(g => {
     const wallets = store.wallets.filter(w => (w.type||'cash') === g.type);
+    // For credit: total = total outstanding (sum of positive debts)
     const total   = wallets.reduce((s,w) => s + w.balance, 0);
     const isOpen  = _wgOpen[g.type];
 
     const cardsHtml = wallets.length
       ? wallets.map(w => {
           const wc = walletColor(w);
+          if (g.type === 'credit') {
+            const owed = -w.balance; // negative balance = owed
+            const balColor = owed > 0 ? 'var(--expense)' : 'var(--income)';
+            const balText  = owed > 0 ? `ค้างชำระ ${baht(owed)}` : owed < 0 ? `เครดิต ${baht(-owed)}` : '฿0.00';
+            const due = daysUntilMonthDay(w.dueDay);
+            const dueBadge = (due !== null && due <= 5 && owed > 0)
+              ? `<div style="font-size:9px;background:var(--expense);color:#fff;border-radius:4px;padding:1px 5px;margin-top:3px">ครบชำระ${due===0?'วันนี้':due+' วัน'}</div>` : '';
+            const limitText = w.creditLimit ? `วงเงิน ${bahtShort(w.creditLimit)}` : '';
+            return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
+              <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
+              <div class="wcard-name">${w.name}</div>
+              <div class="wcard-bal" style="color:${balColor};font-size:11px">${balText}</div>
+              ${limitText?`<div style="font-size:10px;color:var(--fg-muted)">${limitText}</div>`:''}
+              ${dueBadge}
+            </div>`;
+          }
           return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
             <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
             <div class="wcard-name">${w.name}</div>
@@ -1840,6 +1884,17 @@ function renderWallets() {
           </div>`;
         }).join('')
       : `<div class="wgroup-empty">ยังไม่มีบัญชีในกลุ่มนี้</div>`;
+
+    // For credit group header show total outstanding
+    let groupBalHtml;
+    if (g.type === 'credit') {
+      const owed = -total;
+      groupBalHtml = owed > 0
+        ? `<div class="wgroup-bal" style="color:var(--expense)">ค้างชำระ ${baht(owed)}</div>`
+        : `<div class="wgroup-bal" style="color:var(--income)">${baht(Math.abs(total))}</div>`;
+    } else {
+      groupBalHtml = `<div class="wgroup-bal">${baht(total)}</div>`;
+    }
 
     return `<div class="wgroup">
       <div class="wgroup-bar" id="wg-bar-${g.type}" onclick="toggleWalletGroup('${g.type}')">
@@ -1849,7 +1904,7 @@ function renderWallets() {
           <div class="wgroup-meta">${wallets.length} บัญชี</div>
         </div>
         <div class="wgroup-right">
-          <div class="wgroup-bal">${baht(total)}</div>
+          ${groupBalHtml}
           <div class="wgroup-chevron${isOpen?' open':''}" id="wg-chev-${g.type}">▼</div>
         </div>
       </div>
@@ -2025,6 +2080,43 @@ function openWalletDetail(wid) {
       <div class="tx-right"><div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${baht(tx.amount)}</div></div>
     </div>`;
   }).join('')||'<div style="text-align:center;padding:24px;color:var(--fg-muted);font-size:13px">ยังไม่มีรายการ</div>';
+  const isCredit = w.type === 'credit';
+  const owed     = isCredit ? -w.balance : 0;
+  const balDisplay = isCredit
+    ? (owed > 0 ? `<span style="color:var(--expense)">ค้างชำระ ${baht(owed)}</span>`
+                : `<span style="color:var(--income)">ไม่มียอดค้างชำระ</span>`)
+    : `<span style="color:${wc.c}">${baht(w.balance)}</span>`;
+
+  let creditInfoHtml = '';
+  if (isCredit) {
+    const due = daysUntilMonthDay(w.dueDay);
+    const avail = w.creditLimit ? Math.max(0, w.creditLimit - owed) : null;
+    const dueAlert = (due !== null && due <= 5 && owed > 0)
+      ? `<div style="background:var(--expense-s);border:1px solid var(--expense);border-radius:var(--rad-s);
+          padding:10px 14px;margin:0 14px 12px;font-size:12px;color:var(--expense);font-weight:600">
+          ⚠️ ครบชำระใน ${due===0?'วันนี้!':due+' วัน'} — ยอดค้างชำระ ${baht(owed)}
+        </div>` : '';
+    creditInfoHtml = dueAlert + `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 14px 14px;">
+        ${w.creditLimit?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-s);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--fg-muted);font-weight:600">วงเงิน</div>
+          <div style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace">${baht(w.creditLimit)}</div>
+        </div>`:''}
+        ${avail!==null?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-s);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--fg-muted);font-weight:600">วงเงินคงเหลือ</div>
+          <div style="font-size:13px;font-weight:700;color:var(--income);font-family:'IBM Plex Mono',monospace">${baht(avail)}</div>
+        </div>`:''}
+        ${w.statementDay?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-s);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--fg-muted);font-weight:600">ตัดรอบ</div>
+          <div style="font-size:13px;font-weight:700">วันที่ ${w.statementDay}</div>
+        </div>`:''}
+        ${w.dueDay?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-s);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--fg-muted);font-weight:600">ครบชำระ</div>
+          <div style="font-size:13px;font-weight:700${due!==null&&due<=5?' ;color:var(--expense)':''}">วันที่ ${w.dueDay}</div>
+        </div>`:''}
+      </div>`;
+  }
+
   document.getElementById('wallet-detail-content').innerHTML=`
     <div class="drag-pill" style="margin-top:10px"></div>
     <div class="sheet-hdr">
@@ -2032,19 +2124,20 @@ function openWalletDetail(wid) {
         <div class="wcard-icon" style="width:46px;height:46px;border-radius:14px;background:${wc.s};color:${wc.c};font-size:22px">${w.icon}</div>
         <div>
           <div style="font-size:15px;font-weight:700">${w.name}</div>
-          <div style="font-size:22px;font-weight:700;color:${wc.c};font-family:'IBM Plex Mono',monospace">${baht(w.balance)}</div>
+          <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace">${balDisplay}</div>
         </div>
       </div>
       <button class="close-btn" onclick="closeOverlay('wallet-overlay')">✕</button>
     </div>
+    ${creditInfoHtml}
     <div style="display:flex;background:var(--surface2);margin:0 14px 14px;border-radius:var(--rad-s);overflow:hidden;">
       <div style="flex:1;padding:10px 14px;">
-        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">รายรับรวม</div>
-        <div style="font-size:16px;font-weight:700;color:var(--income);font-family:'IBM Plex Mono',monospace">+${baht(income)}</div>
+        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">${isCredit?'ใช้บัตร':'รายรับรวม'}</div>
+        <div style="font-size:16px;font-weight:700;color:${isCredit?'var(--expense)':'var(--income)'};font-family:'IBM Plex Mono',monospace">${isCredit?'−':'+'} ${baht(isCredit?expense:income)}</div>
       </div>
       <div style="flex:1;padding:10px 14px;border-left:1px solid var(--border);">
-        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">รายจ่ายรวม</div>
-        <div style="font-size:16px;font-weight:700;color:var(--expense);font-family:'IBM Plex Mono',monospace">−${baht(expense)}</div>
+        <div style="font-size:10px;color:var(--fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">${isCredit?'ชำระบิล':'รายจ่ายรวม'}</div>
+        <div style="font-size:16px;font-weight:700;color:${isCredit?'var(--income)':'var(--expense)'};font-family:'IBM Plex Mono',monospace">${isCredit?'+':'−'} ${baht(isCredit?income:expense)}</div>
       </div>
     </div>
     <div style="padding:0 14px 8px;font-size:13px;font-weight:700;color:var(--fg2)">รายการล่าสุด</div>
@@ -2914,16 +3007,20 @@ let wmWtype    = 'cash'; // selected wtype tab
 // ── Wallet type summary bar ───────────────────────────
 function renderWalletTypeSummary() {
   const types = [
-    { key:'cash',    label:'เงินสด',   icon:'💵', c:'var(--cash-c)' },
-    { key:'bank',    label:'ธนาคาร',   icon:'🏦', c:'var(--bank-c)' },
-    { key:'ewallet', label:'E-Wallet', icon:'📱', c:'var(--ew-c)'  },
+    { key:'cash',    label:'เงินสด',      icon:'💵', c:'var(--cash-c)', isDebt:false },
+    { key:'bank',    label:'ธนาคาร',      icon:'🏦', c:'var(--bank-c)', isDebt:false },
+    { key:'ewallet', label:'E-Wallet',    icon:'📱', c:'var(--ew-c)',   isDebt:false },
+    { key:'credit',  label:'บัตรเครดิต', icon:'💳', c:'var(--cc-c)',   isDebt:true  },
   ];
   const el = document.getElementById('wtype-summary');
   el.innerHTML = types.map(t => {
     const total = store.wallets.filter(w=>w.type===t.key).reduce((s,w)=>s+w.balance,0);
+    const displayBal = t.isDebt
+      ? (total < 0 ? `<span style="color:var(--expense)">ค้างชำระ ${baht(-total)}</span>` : baht(Math.abs(total)))
+      : `<span style="color:${t.c}">${baht(total)}</span>`;
     return `<div class="wtype-sum-item">
       <div class="wtype-sum-label">${t.icon} ${t.label}</div>
-      <div class="wtype-sum-bal" style="color:${t.c}">${baht(total)}</div>
+      <div class="wtype-sum-bal">${displayBal}</div>
     </div>`;
   }).join('');
 }
@@ -3154,34 +3251,62 @@ function renderWalletEditForm(w, isNew) {
 
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ประเภท</label>
-        <div class="wtype-tabs">
+        <div class="wtype-tabs" style="flex-wrap:wrap;">
           <button class="wtype-tab${wmWtype==='cash'?' active':''}" onclick="selectWtype('cash')">💵 เงินสด</button>
           <button class="wtype-tab${wmWtype==='bank'?' active':''}" onclick="selectWtype('bank')">🏦 ธนาคาร</button>
           <button class="wtype-tab${wmWtype==='ewallet'?' active':''}" onclick="selectWtype('ewallet')">📱 E-Wallet</button>
+          <button class="wtype-tab${wmWtype==='credit'?' active':''}" onclick="selectWtype('credit')">💳 บัตรเครดิต</button>
         </div>
       </div>
 
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">เลือกธนาคาร / ประเภท</label>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">เลือกธนาคาร / ประเภทบัตร</label>
         <div class="bank-picker" id="wm-bank-picker">${bankPickerHtml}</div>
       </div>
 
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">เลขที่บัญชี (ไม่บังคับ)</label>
-        <input id="wm-acct" type="text" value="${w ? (w.acctNo||'') : ''}" placeholder="xxx-x-xxxxx-x"
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'เลขบัตร 4 หลักสุดท้าย (ไม่บังคับ)':'เลขที่บัญชี (ไม่บังคับ)'}</label>
+        <input id="wm-acct" type="text" value="${w ? (w.acctNo||'') : ''}" placeholder="${wmWtype==='credit'?'xxxx':'xxx-x-xxxxx-x'}"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
       </div>
 
+      ${wmWtype==='credit' ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">วงเงิน (฿)</label>
+          <input id="wm-creditlimit" type="number" value="${w ? (w.creditLimit||'') : ''}" min="0" step="1000" placeholder="0"
+            style="width:100%;padding:10px 8px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+            background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--fg);box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">วันตัดรอบ</label>
+          <input id="wm-statday" type="number" value="${w ? (w.statementDay||'') : ''}" min="1" max="31" placeholder="เช่น 5"
+            style="width:100%;padding:10px 8px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+            background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--fg);box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">วันครบชำระ</label>
+          <input id="wm-dueday" type="number" value="${w ? (w.dueDay||'') : ''}" min="1" max="31" placeholder="เช่น 25"
+            style="width:100%;padding:10px 8px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+            background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--fg);box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="background:var(--accent-s);border-radius:var(--rad-s);padding:10px 12px;font-size:11px;color:var(--accent)">
+        💡 บันทึกค่าใช้จ่ายบัตรเครดิตเป็น <strong>รายจ่าย</strong> → ยอดค้างชำระจะเพิ่มขึ้น<br>
+        เมื่อชำระบิล ให้ <strong>โอนเงิน</strong> จากบัญชีธนาคารมาที่บัตรเครดิต
+      </div>` : ''}
+
       ${isNew ? `<div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ยอดเงินเริ่มต้น (฿)</label>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'ยอดค้างชำระปัจจุบัน (฿) — ถ้ายังไม่มีใส่ 0':'ยอดเงินเริ่มต้น (฿)'}</label>
         <input id="wm-balance" type="number" value="0" min="0" step="0.01" placeholder="0.00"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
+        ${wmWtype==='credit'?'<div style="font-size:11px;color:var(--fg-muted);margin-top:4px">ระบบจะเก็บเป็นยอดลบ (เงินที่ต้องจ่ายให้ธนาคาร)</div>':''}
       </div>` : `<div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">ปรับยอดเงิน (฿)</label>
-        <div style="font-size:11px;color:var(--fg-muted);margin-bottom:6px">ยอดปัจจุบัน: <span style="font-weight:700;color:var(--fg);font-family:'IBM Plex Mono',monospace">${baht(w.balance)}</span> — ใส่ยอดที่ถูกต้องเพื่อแก้ไข</div>
-        <input id="wm-balance" type="number" value="${w.balance}" step="0.01" placeholder="${w.balance}"
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'ปรับยอดค้างชำระ (฿)':'ปรับยอดเงิน (฿)'}</label>
+        <div style="font-size:11px;color:var(--fg-muted);margin-bottom:6px">ยอดปัจจุบัน: <span style="font-weight:700;color:${w&&wmWtype==='credit'?'var(--expense)':'var(--fg)'};font-family:'IBM Plex Mono',monospace">${w?(wmWtype==='credit'&&w.balance<0?'ค้างชำระ '+baht(-w.balance):baht(w.balance)):'฿0.00'}</span>${wmWtype==='credit'?' — ใส่ยอดค้างชำระที่ถูกต้อง':' — ใส่ยอดที่ถูกต้องเพื่อแก้ไข'}</div>
+        <input id="wm-balance" type="number" value="${w?(wmWtype==='credit'&&w.balance<0?-w.balance:w.balance):0}" step="0.01"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
         <div style="font-size:11px;color:var(--fg-muted);margin-top:4px">⚠️ การปรับยอดนี้จะแก้ไขตรงๆ ไม่สร้างรายการธุรกรรม</div>
@@ -3228,13 +3353,22 @@ function saveWallet(isNew) {
   }
   const bi = BANK_INFO[wmBankCode] || BANK_INFO.other;
   const acctNo = (document.getElementById('wm-acct').value||'').trim();
+  const isCredit = wmWtype === 'credit';
+
+  // Credit-specific fields
+  const creditLimit    = isCredit ? (parseFloat(document.getElementById('wm-creditlimit')?.value)||0) : 0;
+  const statementDay   = isCredit ? (parseInt(document.getElementById('wm-statday')?.value)||0) : 0;
+  const dueDay         = isCredit ? (parseInt(document.getElementById('wm-dueday')?.value)||0) : 0;
 
   if (isNew) {
-    const bal = parseFloat(document.getElementById('wm-balance').value)||0;
+    const rawBal = parseFloat(document.getElementById('wm-balance').value)||0;
+    // For credit: user enters "amount owed" → store as negative balance
+    const bal = isCredit ? -rawBal : rawBal;
     const id  = 'w_'+(Date.now());
     store.wallets.push({
       id, name, type: wmWtype, bankCode: wmBankCode,
       icon: bi.icon, balance: bal, acctNo,
+      ...(isCredit && { creditLimit, statementDay, dueDay }),
     });
   } else {
     const w = walletById(wmEditId); if (!w) return;
@@ -3243,8 +3377,16 @@ function saveWallet(isNew) {
     w.bankCode = wmBankCode;
     w.icon     = bi.icon;
     w.acctNo   = acctNo;
-    const newBal = parseFloat(document.getElementById('wm-balance').value);
-    if (!isNaN(newBal)) w.balance = newBal;
+    if (isCredit) {
+      w.creditLimit  = creditLimit;
+      w.statementDay = statementDay;
+      w.dueDay       = dueDay;
+      const rawBal = parseFloat(document.getElementById('wm-balance').value);
+      if (!isNaN(rawBal)) w.balance = -rawBal; // user enters owed amount → negative
+    } else {
+      const newBal = parseFloat(document.getElementById('wm-balance').value);
+      if (!isNaN(newBal)) w.balance = newBal;
+    }
   }
 
   saveStore();
@@ -4315,6 +4457,7 @@ function markDebtPaid(id) {
   const d = store.debts.find(x=>x.id===id);
   if (d) { d.paid = true; saveStore(); renderDebtBody(); showToast('✅ บันทึกว่าชำระแล้ว'); }
 }
+</script>
 </script>
 
 <script>
