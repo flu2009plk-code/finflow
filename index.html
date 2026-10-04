@@ -1,17 +1,16 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#4F46E5">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="FinFlow">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-</head>
-<body>
-<title>FinFlow</title>
+  <meta name="theme-color" content="#4F46E5">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-apple-touch.png">
+  <title>FinFlow</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 
 <style>
@@ -38,6 +37,8 @@
   --ew-s:      #EDE9FE;
   --cc-c:      #B91C1C;
   --cc-s:      #FEE2E2;
+  --sv-c:      #0F766E;
+  --sv-s:      #CCFBF1;
   --sh:        0 1px 3px rgba(0,0,0,.07),0 2px 8px rgba(0,0,0,.05);
   --sh-lg:     0 8px 32px rgba(0,0,0,.13);
   --rad:       14px;
@@ -54,6 +55,7 @@
     --bank-c:#60A5FA; --bank-s:#0C1A3A;
     --ew-c:#A78BFA; --ew-s:#1C1040;
     --cc-c:#F87171; --cc-s:#450A0A;
+    --sv-c:#2DD4BF; --sv-s:#042F2E;
     --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
     --sh-lg:0 8px 32px rgba(0,0,0,.6);
     color-scheme:dark;
@@ -69,6 +71,7 @@
   --bank-c:#60A5FA; --bank-s:#0C1A3A;
   --ew-c:#A78BFA; --ew-s:#1C1040;
   --cc-c:#F87171; --cc-s:#450A0A;
+  --sv-c:#2DD4BF; --sv-s:#042F2E;
   --sh:0 1px 3px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.3);
   --sh-lg:0 8px 32px rgba(0,0,0,.6);
   color-scheme:dark;
@@ -864,8 +867,9 @@ body{
 
   <div class="scroll-body">
     <div class="balance-card">
-      <div class="bc-label">ยอดคงเหลือรวม</div>
+      <div class="bc-label">ยอดคงเหลือรวม (รวมเงินออม)</div>
       <div class="bc-amount" id="total-balance">฿0.00</div>
+      <div id="savings-subtitle" style="display:none;font-size:11px;color:rgba(255,255,255,.75);margin:-4px 0 6px;text-align:center"></div>
       <div class="bc-row">
         <div class="bc-stat">
           <div class="bc-stat-lbl">รายรับเดือนนี้</div>
@@ -922,6 +926,15 @@ body{
         <button class="text-btn" onclick="openBudget()" style="font-size:13px">⚙️ ตั้งค่า</button>
       </div>
       <div id="budget-alerts-body"></div>
+    </div>
+
+    <!-- V18: Upcoming recurring expense alerts -->
+    <div id="upcoming-alerts-section" class="section" style="display:none">
+      <div class="sec-hdr">
+        <span class="sec-title">⏰ รายการที่กำลังจะถึง</span>
+        <button class="text-btn" onclick="openRecurring()" style="font-size:13px">ดูทั้งหมด</button>
+      </div>
+      <div id="upcoming-alerts-body" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>
 
     <div class="section">
@@ -1257,7 +1270,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v19';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1293,10 +1306,11 @@ const CAT_ICON = {
 const METHOD_LABEL = {manual:'✏️ บันทึก', voice:'🎙️ เสียง', slip:'📷 สลิป', transfer:'🔄 โอน', recurring:'🔁 ประจำ'};
 
 const WALLET_COLORS = {
-  cash:   {c:'var(--cash-c)',  s:'var(--cash-s)'},
-  bank:   {c:'var(--bank-c)', s:'var(--bank-s)'},
-  ewallet:{c:'var(--ew-c)',   s:'var(--ew-s)'},
-  credit: {c:'var(--cc-c)',   s:'var(--cc-s)'},
+  cash:    {c:'var(--cash-c)',  s:'var(--cash-s)'},
+  bank:    {c:'var(--bank-c)', s:'var(--bank-s)'},
+  ewallet: {c:'var(--ew-c)',   s:'var(--ew-s)'},
+  credit:  {c:'var(--cc-c)',   s:'var(--cc-s)'},
+  savings: {c:'var(--sv-c)',   s:'var(--sv-s)'},
 };
 
 // Bank-specific colors and metadata
@@ -1327,6 +1341,17 @@ const BANK_INFO = {
   aeon:      { abbr:'AEON',   name:'AEON',           type:'credit',  icon:'💳', c:'#9B1C1C', s:'#FEE2E2' },
   citi:      { abbr:'Citi',   name:'Citi/Krungsri',  type:'credit',  icon:'💳', c:'#1D4ED8', s:'#DBEAFE' },
   othercc:   { abbr:'อื่นๆ',  name:'บัตรอื่นๆ',     type:'credit',  icon:'💳', c:'#6B7280', s:'#F3F4F6' },
+  // Savings & investments
+  gpf:       { abbr:'กบข.',   name:'กบข.',           type:'savings', icon:'🏛️', c:'#0F766E', s:'#CCFBF1' },
+  coop:      { abbr:'สหกรณ์', name:'เงินฝากสหกรณ์',  type:'savings', icon:'🤝', c:'#0369A1', s:'#E0F2FE' },
+  gsb_bond:  { abbr:'ออมสิน', name:'สลากออมสิน',     type:'savings', icon:'🎟️', c:'#BE185D', s:'#FCE7F3' },
+  nsf:       { abbr:'กสจ.',   name:'กองทุนสำรองเลี้ยงชีพ', type:'savings', icon:'🛡️', c:'#7C3AED', s:'#EDE9FE' },
+  mutual:    { abbr:'กองทุน', name:'กองทุนรวม',       type:'savings', icon:'📊', c:'#1D4ED8', s:'#DBEAFE' },
+  ssf:       { abbr:'SSF',    name:'กองทุน SSF',      type:'savings', icon:'🌿', c:'#15803D', s:'#DCFCE7' },
+  rmf:       { abbr:'RMF',    name:'กองทุน RMF',      type:'savings', icon:'🌿', c:'#166534', s:'#BBF7D0' },
+  gold:      { abbr:'ทอง',    name:'ทองคำ',           type:'savings', icon:'🥇', c:'#B45309', s:'#FEF3C7' },
+  stock:     { abbr:'หุ้น',   name:'หุ้น/พอร์ต',      type:'savings', icon:'📈', c:'#0F766E', s:'#CCFBF1' },
+  othersv:   { abbr:'อื่นๆ',  name:'ออมทรัพย์อื่นๆ', type:'savings', icon:'💰', c:'#6B7280', s:'#F3F4F6' },
 };
 
 const BANK_TYPE_LIST = {
@@ -1334,6 +1359,7 @@ const BANK_TYPE_LIST = {
   bank:    ['kbank','ktb','scb','bbl','bay','gsb','ttb','uob','cimb','other'],
   ewallet: ['tmw','promptpay','rabbit','shopeepay'],
   credit:  ['ktc','kbankcc','scbcc','baycc','bblcc','ttbcc','uobcc','aeon','citi','othercc'],
+  savings: ['gpf','coop','gsb_bond','nsf','mutual','ssf','rmf','gold','stock','othersv'],
 };
 
 const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
@@ -1804,6 +1830,7 @@ function renderAll() {
   renderChart();
   renderTrendChart();
   renderBudgetAlerts(); // V13A
+  renderUpcomingAlerts(); // V18
   renderTxList();
 }
 
@@ -1813,15 +1840,33 @@ function renderHeader() {
   if (vc) vc.textContent = APP_VERSION;
 }
 
+function totalLiquid() {
+  return store.wallets.filter(w=>(w.type||'cash')!=='savings').reduce((s,w)=>s+w.balance,0);
+}
+function totalSavings() {
+  return store.wallets.filter(w=>w.type==='savings').reduce((s,w)=>s+w.balance,0);
+}
+
 function renderBalance() {
   document.getElementById('total-balance').textContent = baht(totalBalance());
+  // Show savings breakdown if any savings wallets exist
+  const sv = totalSavings();
+  const svEl = document.getElementById('savings-subtitle');
+  if (svEl) {
+    if (sv > 0) {
+      svEl.innerHTML = `เงินหมุนเวียน <span style="font-weight:700">${baht(totalLiquid())}</span> · เงินออม <span style="font-weight:700;color:var(--sv-c)">${baht(sv)}</span>`;
+      svEl.style.display = '';
+    } else {
+      svEl.style.display = 'none';
+    }
+  }
   const { income, expense } = monthSums(viewYear, viewMonth);
   document.getElementById('month-income').textContent  = '+'+baht(income);
   document.getElementById('month-expense').textContent = '-'+baht(expense);
 }
 
 // Wallet group open state (persists across renders)
-const _wgOpen = { cash: true, bank: true, ewallet: true, credit: true };
+const _wgOpen = { cash: true, bank: true, ewallet: true, credit: true, savings: true };
 
 function toggleWalletGroup(type) {
   _wgOpen[type] = !_wgOpen[type];
@@ -1844,10 +1889,11 @@ function daysUntilMonthDay(day) {
 
 function renderWallets() {
   const GROUPS = [
-    { type:'cash',    label:'เงินสด',       ico:'💵', c:'var(--cash-c)',  s:'var(--cash-s)'  },
-    { type:'bank',    label:'ธนาคาร',       ico:'🏦', c:'var(--bank-c)',  s:'var(--bank-s)'  },
-    { type:'ewallet', label:'E-Wallet',     ico:'📱', c:'var(--ew-c)',    s:'var(--ew-s)'    },
-    { type:'credit',  label:'บัตรเครดิต',  ico:'💳', c:'var(--cc-c)',    s:'var(--cc-s)'    },
+    { type:'cash',    label:'เงินสด',           ico:'💵', c:'var(--cash-c)',  s:'var(--cash-s)'  },
+    { type:'bank',    label:'ธนาคาร',           ico:'🏦', c:'var(--bank-c)',  s:'var(--bank-s)'  },
+    { type:'ewallet', label:'E-Wallet',         ico:'📱', c:'var(--ew-c)',    s:'var(--ew-s)'    },
+    { type:'credit',  label:'บัตรเครดิต',      ico:'💳', c:'var(--cc-c)',    s:'var(--cc-s)'    },
+    { type:'savings', label:'เงินออม & ลงทุน', ico:'💰', c:'var(--sv-c)',    s:'var(--sv-s)'    },
   ];
   const container = document.getElementById('wallet-groups');
   if (!container) return;
@@ -1875,6 +1921,14 @@ function renderWallets() {
               <div class="wcard-bal" style="color:${balColor};font-size:11px">${balText}</div>
               ${limitText?`<div style="font-size:10px;color:var(--fg-muted)">${limitText}</div>`:''}
               ${dueBadge}
+            </div>`;
+          }
+          if (g.type === 'savings') {
+            return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
+              <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
+              <div class="wcard-name">${w.name}</div>
+              <div class="wcard-bal" style="color:var(--sv-c)">${baht(w.balance)}</div>
+              <div style="font-size:9px;color:var(--sv-c);margin-top:2px">🔒 ออมทรัพย์</div>
             </div>`;
           }
           return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
@@ -3007,22 +3061,33 @@ let wmWtype    = 'cash'; // selected wtype tab
 // ── Wallet type summary bar ───────────────────────────
 function renderWalletTypeSummary() {
   const types = [
-    { key:'cash',    label:'เงินสด',      icon:'💵', c:'var(--cash-c)', isDebt:false },
-    { key:'bank',    label:'ธนาคาร',      icon:'🏦', c:'var(--bank-c)', isDebt:false },
-    { key:'ewallet', label:'E-Wallet',    icon:'📱', c:'var(--ew-c)',   isDebt:false },
-    { key:'credit',  label:'บัตรเครดิต', icon:'💳', c:'var(--cc-c)',   isDebt:true  },
+    { key:'cash',    label:'เงินสด',           icon:'💵', c:'var(--cash-c)', isDebt:false, isSav:false },
+    { key:'bank',    label:'ธนาคาร',           icon:'🏦', c:'var(--bank-c)', isDebt:false, isSav:false },
+    { key:'ewallet', label:'E-Wallet',         icon:'📱', c:'var(--ew-c)',   isDebt:false, isSav:false },
+    { key:'credit',  label:'บัตรเครดิต',      icon:'💳', c:'var(--cc-c)',   isDebt:true,  isSav:false },
+    { key:'savings', label:'เงินออม & ลงทุน', icon:'💰', c:'var(--sv-c)',   isDebt:false, isSav:true  },
   ];
   const el = document.getElementById('wtype-summary');
-  el.innerHTML = types.map(t => {
-    const total = store.wallets.filter(w=>w.type===t.key).reduce((s,w)=>s+w.balance,0);
-    const displayBal = t.isDebt
-      ? (total < 0 ? `<span style="color:var(--expense)">ค้างชำระ ${baht(-total)}</span>` : baht(Math.abs(total)))
-      : `<span style="color:${t.c}">${baht(total)}</span>`;
-    return `<div class="wtype-sum-item">
-      <div class="wtype-sum-label">${t.icon} ${t.label}</div>
+  const rows = types.map(t => {
+    const wallets = store.wallets.filter(w=>w.type===t.key);
+    if (!wallets.length) return '';
+    const total = wallets.reduce((s,w)=>s+w.balance,0);
+    let displayBal;
+    if (t.isDebt) {
+      displayBal = total < 0
+        ? `<span style="color:var(--expense)">ค้างชำระ ${baht(-total)}</span>`
+        : baht(Math.abs(total));
+    } else if (t.isSav) {
+      displayBal = `<span style="color:var(--sv-c);font-weight:700">${baht(total)}</span>`;
+    } else {
+      displayBal = `<span style="color:${t.c}">${baht(total)}</span>`;
+    }
+    return `<div class="wtype-sum-item" ${t.isSav?'style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px"':''}>
+      <div class="wtype-sum-label">${t.icon} ${t.label}${t.isSav?'<span style="font-size:10px;color:var(--fg-muted);margin-left:4px">🔒</span>':''}</div>
       <div class="wtype-sum-bal">${displayBal}</div>
     </div>`;
-  }).join('');
+  }).filter(Boolean).join('');
+  el.innerHTML = rows;
 }
 
 // ── Wallet reorder ────────────────────────────────────
@@ -3256,6 +3321,7 @@ function renderWalletEditForm(w, isNew) {
           <button class="wtype-tab${wmWtype==='bank'?' active':''}" onclick="selectWtype('bank')">🏦 ธนาคาร</button>
           <button class="wtype-tab${wmWtype==='ewallet'?' active':''}" onclick="selectWtype('ewallet')">📱 E-Wallet</button>
           <button class="wtype-tab${wmWtype==='credit'?' active':''}" onclick="selectWtype('credit')">💳 บัตรเครดิต</button>
+          <button class="wtype-tab${wmWtype==='savings'?' active':''}" onclick="selectWtype('savings')">💰 เงินออม</button>
         </div>
       </div>
 
@@ -3265,11 +3331,17 @@ function renderWalletEditForm(w, isNew) {
       </div>
 
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'เลขบัตร 4 หลักสุดท้าย (ไม่บังคับ)':'เลขที่บัญชี (ไม่บังคับ)'}</label>
-        <input id="wm-acct" type="text" value="${w ? (w.acctNo||'') : ''}" placeholder="${wmWtype==='credit'?'xxxx':'xxx-x-xxxxx-x'}"
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'เลขบัตร 4 หลักสุดท้าย (ไม่บังคับ)':wmWtype==='savings'?'หมายเลขสมาชิก / อ้างอิง (ไม่บังคับ)':'เลขที่บัญชี (ไม่บังคับ)'}</label>
+        <input id="wm-acct" type="text" value="${w ? (w.acctNo||'') : ''}" placeholder="${wmWtype==='credit'?'xxxx':wmWtype==='savings'?'เช่น 00123456':' xxx-x-xxxxx-x'}"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
       </div>
+
+      ${wmWtype==='savings' ? `
+      <div style="background:var(--sv-s);border-radius:var(--rad-s);padding:10px 12px;font-size:11px;color:var(--sv-c);line-height:1.6">
+        🔒 <strong>เงินออม & ลงทุน</strong> จะนับรวมในทรัพย์สินสุทธิ แต่แสดงแยกจากเงินหมุนเวียน<br>
+        บันทึกการฝากเป็น <strong>รายรับ</strong> และการถอนเป็น <strong>รายจ่าย</strong>
+      </div>` : ''}
 
       ${wmWtype==='credit' ? `
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
@@ -3298,7 +3370,7 @@ function renderWalletEditForm(w, isNew) {
       </div>` : ''}
 
       ${isNew ? `<div>
-        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'ยอดค้างชำระปัจจุบัน (฿) — ถ้ายังไม่มีใส่ 0':'ยอดเงินเริ่มต้น (฿)'}</label>
+        <label style="font-size:12px;font-weight:600;color:var(--fg2);display:block;margin-bottom:6px">${wmWtype==='credit'?'ยอดค้างชำระปัจจุบัน (฿) — ถ้ายังไม่มีใส่ 0':wmWtype==='savings'?'ยอดเงินออมปัจจุบัน (฿)':'ยอดเงินเริ่มต้น (฿)'}</label>
         <input id="wm-balance" type="number" value="0" min="0" step="0.01" placeholder="0.00"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--fg);box-sizing:border-box;">
@@ -3611,6 +3683,106 @@ function renderBudgetAlerts() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  V18: UPCOMING RECURRING ALERTS
+// ═══════════════════════════════════════════════════════
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function renderUpcomingAlerts() {
+  const sec  = document.getElementById('upcoming-alerts-section');
+  const body = document.getElementById('upcoming-alerts-body');
+  if (!sec || !body) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const ty = today.getFullYear();
+  const tm = today.getMonth();    // 0-based
+  const td = today.getDate();
+  const WINDOW = 30; // show items due within 30 days
+
+  const items = [];
+  (store.recurring || []).filter(r => r.active !== false).forEach(r => {
+    const freq = r.freq || 'monthly';
+    let daysLeft = null;
+    let labelDate = '';
+    let alreadyDone = false;
+
+    if (freq === 'yearly') {
+      const rM = r.month || 1; // 1-based
+      const rD = r.day || 1;
+      // Candidate: this year's occurrence
+      let fireDate = new Date(ty, rM-1, rD);
+      if (fireDate < today) {
+        // already past this year → check next year
+        fireDate = new Date(ty+1, rM-1, rD);
+      }
+      daysLeft = Math.round((fireDate - today) / 86400000);
+      labelDate = `${rD} ${THAI_MONTHS_SHORT[rM-1]} ${fireDate.getFullYear()+543}`;
+      // Check if recorded this year already
+      alreadyDone = store.txns.some(tx =>
+        tx.recurringId === r.id &&
+        tx.date.startsWith(`${fireDate.getFullYear()}-`)
+      );
+    } else {
+      // monthly
+      const rD = r.day || 1;
+      let fireDate = new Date(ty, tm, rD);
+      if (fireDate < today) {
+        // this month's date already passed → next month
+        fireDate = new Date(ty, tm+1, rD);
+      }
+      daysLeft = Math.round((fireDate - today) / 86400000);
+      const mStr = String(fireDate.getMonth()+1).padStart(2,'0');
+      labelDate = `${rD} ${THAI_MONTHS_SHORT[fireDate.getMonth()]}`;
+      alreadyDone = store.txns.some(tx =>
+        tx.recurringId === r.id &&
+        tx.date.startsWith(`${fireDate.getFullYear()}-${mStr}-`)
+      );
+    }
+
+    if (daysLeft <= WINDOW && !alreadyDone) {
+      items.push({ r, daysLeft, labelDate });
+    }
+  });
+
+  if (!items.length) { sec.style.display = 'none'; return; }
+
+  // Sort: soonest first
+  items.sort((a,b) => a.daysLeft - b.daysLeft);
+
+  body.innerHTML = items.map(({ r, daysLeft, labelDate }) => {
+    const isInc = r.type === 'income';
+    const icon = CAT_ICON[r.cat] || '📝';
+    const urgent = daysLeft <= 3;
+    const freq = r.freq || 'monthly';
+    const freqLabel = freq === 'yearly' ? '📅 รายปี' : '🔄 รายเดือน';
+    const dayLabel = daysLeft === 0 ? 'วันนี้!' : daysLeft === 1 ? 'พรุ่งนี้' : `${daysLeft} วัน`;
+    return `
+    <div style="
+      display:flex;align-items:center;gap:10px;
+      padding:10px 12px;border-radius:var(--rad-s);
+      background:${urgent?'var(--expense-s)':'var(--surface2)'};
+      border:1px solid ${urgent?'var(--expense)':'var(--border)'}">
+      <div style="width:36px;height:36px;border-radius:10px;flex-shrink:0;
+        background:${isInc?'var(--income-s)':'var(--expense-s)'};
+        color:${isInc?'var(--income)':'var(--expense)'};
+        display:flex;align-items:center;justify-content:center;font-size:18px">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--fg)">${r.name}</div>
+        <div style="font-size:11px;color:var(--fg-muted)">${freqLabel} · ${labelDate}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+          color:${isInc?'var(--income)':'var(--expense)'}">
+          ${isInc?'+':'−'}${baht(r.amount)}</div>
+        <div style="font-size:11px;font-weight:700;color:${urgent?'var(--expense)':'var(--fg-muted)'}">
+          ${dayLabel}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  sec.style.display = '';
+}
+
+// ═══════════════════════════════════════════════════════
 //  V13B: TAG HELPERS
 // ═══════════════════════════════════════════════════════
 function parseTags(str) {
@@ -3657,33 +3829,54 @@ function processRecurring() {
   let changed = false;
 
   store.recurring.filter(r => r.active !== false).forEach(r => {
-    if (td < r.day) return; // not reached this month's scheduled day yet
-    // Check if already recorded this month
-    const already = store.txns.some(tx =>
-      tx.recurringId === r.id &&
-      tx.date.startsWith(`${yStr}-${mStr}-`)
-    );
-    if (already) return;
-    // Build date string — clamp day to last day of month
-    const lastDay = new Date(ty, tm+1, 0).getDate();
-    const day = Math.min(r.day, lastDay);
-    const dateStr = `${yStr}-${mStr}-${String(day).padStart(2,'0')}`;
-    const txId = Date.now() + Math.floor(Math.random()*1000);
-    store.txns.push({
-      id: txId,
-      date: dateStr,
-      type: r.type,
-      amount: r.amount,
-      cat: r.cat,
-      wallet: r.wallet,
-      desc: r.name,
-      method: 'recurring',
-      recurringId: r.id,
-    });
-    // Adjust wallet balance
-    const w = walletById(r.wallet);
-    if (w) w.balance += r.type === 'income' ? r.amount : -r.amount;
-    changed = true;
+    const freq = r.freq || 'monthly';
+
+    if (freq === 'yearly') {
+      const rMonth = r.month || 1; // 1-based
+      const rDay   = r.day   || 1;
+      // Only fire if today >= scheduled month/day
+      if (tm+1 < rMonth) return;
+      if (tm+1 === rMonth && td < rDay) return;
+      // Check if already recorded this year
+      const already = store.txns.some(tx =>
+        tx.recurringId === r.id &&
+        tx.date.startsWith(`${yStr}-`)
+      );
+      if (already) return;
+      const lastDay = new Date(ty, rMonth, 0).getDate();
+      const day = Math.min(rDay, lastDay);
+      const dateStr = `${yStr}-${String(rMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const txId = Date.now() + Math.floor(Math.random()*1000);
+      store.txns.push({
+        id: txId, date: dateStr, type: r.type, amount: r.amount,
+        cat: r.cat, wallet: r.wallet, desc: r.name,
+        method: 'recurring', recurringId: r.id,
+      });
+      const w = walletById(r.wallet);
+      if (w) w.balance += r.type === 'income' ? r.amount : -r.amount;
+      changed = true;
+
+    } else {
+      // monthly (original logic)
+      if (td < r.day) return;
+      const already = store.txns.some(tx =>
+        tx.recurringId === r.id &&
+        tx.date.startsWith(`${yStr}-${mStr}-`)
+      );
+      if (already) return;
+      const lastDay = new Date(ty, tm+1, 0).getDate();
+      const day = Math.min(r.day, lastDay);
+      const dateStr = `${yStr}-${mStr}-${String(day).padStart(2,'0')}`;
+      const txId = Date.now() + Math.floor(Math.random()*1000);
+      store.txns.push({
+        id: txId, date: dateStr, type: r.type, amount: r.amount,
+        cat: r.cat, wallet: r.wallet, desc: r.name,
+        method: 'recurring', recurringId: r.id,
+      });
+      const w = walletById(r.wallet);
+      if (w) w.balance += r.type === 'income' ? r.amount : -r.amount;
+      changed = true;
+    }
   });
 
   if (changed) { saveStore(); return true; }
@@ -3723,10 +3916,23 @@ function renderRecurringBody() {
     const w = walletById(r.wallet);
     const isInc = r.type === 'income';
     const icon = CAT_ICON[r.cat] || '📝';
-    const doneThisMonth = store.txns.some(tx =>
-      tx.recurringId === r.id &&
-      tx.date.startsWith(`${ty}-${mStr}-`)
-    );
+    const freq = r.freq || 'monthly';
+    let scheduleLabel = '';
+    let doneLabel = '';
+    if (freq === 'yearly') {
+      const mName = THAI_MONTHS_SHORT[(r.month||1)-1];
+      scheduleLabel = `📅 ทุกปี ${mName} วันที่ ${r.day}`;
+      const doneThisYear = store.txns.some(tx =>
+        tx.recurringId === r.id && tx.date.startsWith(`${ty}-`)
+      );
+      if (doneThisYear) doneLabel = '<span style="color:var(--income);font-weight:600"> ✓ บันทึกแล้ว</span>';
+    } else {
+      scheduleLabel = `🔄 วันที่ ${r.day} ทุกเดือน`;
+      const doneThisMonth = store.txns.some(tx =>
+        tx.recurringId === r.id && tx.date.startsWith(`${ty}-${mStr}-`)
+      );
+      if (doneThisMonth) doneLabel = '<span style="color:var(--income);font-weight:600"> ✓ บันทึกแล้ว</span>';
+    }
     return `<div style="
       display:flex;align-items:center;gap:10px;
       padding:12px 0;border-bottom:1px solid var(--border)">
@@ -3750,9 +3956,9 @@ function renderRecurringBody() {
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;color:${r.active!==false?'var(--fg)':'var(--fg-muted)'}">${r.name}</div>
         <div style="font-size:11px;color:var(--fg-muted)">
-          ${r.cat} · วันที่ ${r.day} ทุกเดือน
+          ${r.cat} · ${scheduleLabel}
           ${w?`· ${w.name}`:''}
-          ${doneThisMonth?'<span style="color:var(--income);font-weight:600"> ✓ บันทึกแล้ว</span>':''}
+          ${doneLabel}
         </div>
       </div>
       <!-- amount -->
@@ -3789,12 +3995,36 @@ function openRecurringForm(id) {
   openOverlay('recurring-form-overlay');
 }
 
+let _recFreq = 'monthly'; // 'monthly' | 'yearly'
+
+function switchRecFreq(f) {
+  _recFreq = f;
+  const mBtn = document.getElementById('rec-freq-mo');
+  const yBtn = document.getElementById('rec-freq-yr');
+  const yrSec = document.getElementById('rec-year-section');
+  const moSec = document.getElementById('rec-month-section');
+  if (mBtn) {
+    mBtn.style.border = f==='monthly'?'2px solid var(--accent)':'2px solid var(--border)';
+    mBtn.style.background = f==='monthly'?'var(--accent-s)':'var(--surface2)';
+    mBtn.style.color = f==='monthly'?'var(--accent)':'var(--fg-muted)';
+  }
+  if (yBtn) {
+    yBtn.style.border = f==='yearly'?'2px solid var(--accent)':'2px solid var(--border)';
+    yBtn.style.background = f==='yearly'?'var(--accent-s)':'var(--surface2)';
+    yBtn.style.color = f==='yearly'?'var(--accent)':'var(--fg-muted)';
+  }
+  if (yrSec) yrSec.style.display = f==='yearly'?'':'none';
+  if (moSec) moSec.style.display = f==='monthly'?'':'none';
+}
+
 function renderRecurringForm(r) {
   const body = document.getElementById('recurring-form-body');
   const type = r?.type || 'expense';
   const cat  = r?.cat  || 'ค่าสาธารณูปโภค';
   const wid  = r?.wallet || (store.wallets[0]?.id||'');
   const cats = type === 'income' ? CAT_INCOME : CAT_EXPENSE;
+  const freq = r?.freq || 'monthly';
+  _recFreq = freq;
 
   const walletOpts = store.wallets.map(w =>
     `<option value="${w.id}" ${w.id===wid?'selected':''}>${w.icon} ${w.name} (${baht(w.balance)})</option>`
@@ -3805,12 +4035,15 @@ function renderRecurringForm(r) {
   const dayOpts = Array.from({length:28},(_,i)=>i+1).map(d =>
     `<option value="${d}" ${d===(r?.day||1)?'selected':''}>วันที่ ${d}</option>`
   ).join('');
+  const monthOpts = THAI_MONTHS_SHORT.map((m,i) =>
+    `<option value="${i+1}" ${(i+1)===(r?.month||1)?'selected':''}>${m}</option>`
+  ).join('');
 
   body.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:13px">
       <div>
         <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px">ชื่อรายการ</div>
-        <input id="rec-name" type="text" value="${r?.name||''}" placeholder="เช่น ค่าเช่า, Netflix, เงินเดือน"
+        <input id="rec-name" type="text" value="${r?.name||''}" placeholder="เช่น ค่าเช่า, Netflix, ประกันชีวิต"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg);box-sizing:border-box">
       </div>
@@ -3859,13 +4092,60 @@ function renderRecurringForm(r) {
         </select>
       </div>
 
+      <!-- Frequency selector -->
       <div>
-        <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px">บันทึกทุกเดือน</div>
+        <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px">ความถี่</div>
+        <div style="display:flex;gap:8px">
+          <button id="rec-freq-mo" onclick="switchRecFreq('monthly')" style="
+            flex:1;padding:9px;border-radius:var(--rad-s);font-family:inherit;font-size:13px;
+            font-weight:600;cursor:pointer;
+            border:2px solid ${freq==='monthly'?'var(--accent)':'var(--border)'};
+            background:${freq==='monthly'?'var(--accent-s)':'var(--surface2)'};
+            color:${freq==='monthly'?'var(--accent)':'var(--fg-muted)'}">🔄 รายเดือน</button>
+          <button id="rec-freq-yr" onclick="switchRecFreq('yearly')" style="
+            flex:1;padding:9px;border-radius:var(--rad-s);font-family:inherit;font-size:13px;
+            font-weight:600;cursor:pointer;
+            border:2px solid ${freq==='yearly'?'var(--accent)':'var(--border)'};
+            background:${freq==='yearly'?'var(--accent-s)':'var(--surface2)'};
+            color:${freq==='yearly'?'var(--accent)':'var(--fg-muted)'}">📅 รายปี</button>
+        </div>
+      </div>
+
+      <!-- Monthly: day picker -->
+      <div id="rec-month-section" style="display:${freq==='monthly'?'':'none'}">
+        <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px">วันที่ตัดทุกเดือน</div>
         <select id="rec-day"
           style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
           background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg)">
           ${dayOpts}
         </select>
+      </div>
+
+      <!-- Yearly: month + day picker -->
+      <div id="rec-year-section" style="display:${freq==='yearly'?'':'none'}">
+        <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-bottom:6px">วันครบกำหนดทุกปี</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:11px;color:var(--fg-muted);margin-bottom:4px">เดือน</div>
+            <select id="rec-month"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+              background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg)">
+              ${monthOpts}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--fg-muted);margin-bottom:4px">วันที่</div>
+            <select id="rec-day"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+              background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg)">
+              ${dayOpts}
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:9px 12px;border-radius:var(--rad-s);
+          background:var(--accent-s);color:var(--accent);font-size:12px;line-height:1.5">
+          💡 ระบบจะแจ้งเตือนล่วงหน้า 30 วัน และบันทึกรายการอัตโนมัติเมื่อถึงวันกำหนด
+        </div>
       </div>
 
       <button onclick="saveRecurringItem()" style="
@@ -3912,6 +4192,10 @@ function saveRecurringItem() {
   const cat    = document.getElementById('rec-cat').value;
   const wallet = document.getElementById('rec-wallet').value;
   const day    = parseInt(document.getElementById('rec-day').value, 10);
+  const freq   = _recFreq || 'monthly';
+  const month  = freq === 'yearly'
+    ? parseInt(document.getElementById('rec-month')?.value||1, 10)
+    : null;
   // Determine type from which button looks active
   const eBtn = document.getElementById('rec-type-exp');
   const type = (eBtn && eBtn.style.background.includes('expense')) || _recType==='expense'
@@ -3930,17 +4214,20 @@ function saveRecurringItem() {
 
   if (_recEditId) {
     const r = store.recurring.find(x => x.id === _recEditId);
-    if (r) { r.name=name; r.amount=amount; r.cat=cat; r.wallet=wallet; r.day=day; r.type=type; }
+    if (r) {
+      r.name=name; r.amount=amount; r.cat=cat; r.wallet=wallet;
+      r.day=day; r.type=type; r.freq=freq;
+      if (freq==='yearly') r.month=month; else delete r.month;
+    }
   } else {
-    store.recurring.push({
-      id: 'rec_'+Date.now(),
-      name, amount, cat, wallet, day, type, active: true,
-    });
+    const item = { id:'rec_'+Date.now(), name, amount, cat, wallet, day, type, freq, active:true };
+    if (freq==='yearly') item.month = month;
+    store.recurring.push(item);
   }
 
   saveStore();
   closeOverlay('recurring-form-overlay');
-  setTimeout(() => { renderRecurringBody(); }, 200);
+  setTimeout(() => { renderRecurringBody(); renderUpcomingAlerts(); }, 200);
 }
 
 function deleteRecurringItem(id) {
@@ -4458,16 +4745,17 @@ function markDebtPaid(id) {
   if (d) { d.paid = true; saveStore(); renderDebtBody(); showToast('✅ บันทึกว่าชำระแล้ว'); }
 }
 </script>
-</script>
 
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(r=>console.log('[SW] registered',r.scope))
-      .catch(e=>console.warn('[SW] failed',e));
-  });
-}
-</script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(r => console.log('SW registered:', r.scope))
+          .catch(e => console.error('SW error:', e));
+      });
+    }
+  </script>
+</head>
+<body>
 </body>
 </html>
