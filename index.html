@@ -1106,7 +1106,7 @@ body{
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="drag-pill"></div>
     <div class="sheet-hdr">
-      <span class="sheet-title">🔄 โอนเงินระหว่างกระเป๋า</span>
+      <span class="sheet-title" id="transfer-overlay-title">🔄 โอนเงินระหว่างกระเป๋า</span>
       <button class="close-btn" data-close="transfer-overlay">✕</button>
     </div>
     <div class="sheet-body" id="transfer-body"></div>
@@ -1270,7 +1270,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1300,7 +1300,8 @@ const CAT_EXPENSE = ['อาหาร','เดินทาง','ช้อปป�
 const CAT_ICON = {
   'เงินเดือน':'💼','โบนัส':'🎁','รายได้เสริม':'💻','เงินโอน':'💸','อื่นๆ':'➕',
   'อาหาร':'🍜','เดินทาง':'🚗','ช้อปปิ้ง':'🛍️','ค่าสาธารณูปโภค':'💡',
-  'สุขภาพ':'🏥','บันเทิง':'🎮','การศึกษา':'📚',
+  'สุขภาพ':'🏥','บันเทิง':'🎮','การศึกษา':'📚','ชำระบัตรเครดิต':'💳',
+  'โอนเงิน':'🔄',
 };
 
 const METHOD_LABEL = {manual:'✏️ บันทึก', voice:'🎙️ เสียง', slip:'📷 สลิป', transfer:'🔄 โอน', recurring:'🔁 ประจำ'};
@@ -1915,12 +1916,17 @@ function renderWallets() {
             const dueBadge = (due !== null && due <= 5 && owed > 0)
               ? `<div style="font-size:9px;background:var(--expense);color:#fff;border-radius:4px;padding:1px 5px;margin-top:3px">ครบชำระ${due===0?'วันนี้':due+' วัน'}</div>` : '';
             const limitText = w.creditLimit ? `วงเงิน ${bahtShort(w.creditLimit)}` : '';
+            const payBtn = owed > 0
+              ? `<button onclick="event.stopPropagation();openTransferTo('${w.id}')"
+                  style="margin-top:5px;width:100%;padding:4px 0;border:none;border-radius:6px;
+                  background:var(--expense);color:#fff;font-size:10px;font-weight:700;cursor:pointer;
+                  letter-spacing:.03em">💳 ชำระบัตร</button>` : '';
             return `<div class="wcard" onclick="openWalletDetail('${w.id}')">
               <div class="wcard-icon" style="background:${wc.s};color:${wc.c}">${w.icon}</div>
               <div class="wcard-name">${w.name}</div>
               <div class="wcard-bal" style="color:${balColor};font-size:11px">${balText}</div>
               ${limitText?`<div style="font-size:10px;color:var(--fg-muted)">${limitText}</div>`:''}
-              ${dueBadge}
+              ${dueBadge}${payBtn}
             </div>`;
           }
           if (g.type === 'savings') {
@@ -3132,27 +3138,29 @@ function renderWalletMgmtBody() {
 }
 
 // ── Transfer between wallets ──────────────────────────
-function openTransfer() {
-  renderTransferBody();
+function openTransfer(toId) {
+  renderTransferBody(toId || null);
   openOverlay('transfer-overlay');
 }
+function openTransferTo(walletId) {
+  openTransfer(walletId);
+}
 
-function renderTransferBody() {
+function renderTransferBody(preToId) {
   const body = document.getElementById('transfer-body');
   if (store.wallets.length < 2) {
     body.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--fg-muted);font-size:13px">
       ต้องมีกระเป๋าเงินอย่างน้อย 2 ใบ<br>เพื่อโอนเงินระหว่างกัน</div>`;
     return;
   }
-  const optHtml = store.wallets.map(w => {
-    const bi = BANK_INFO[w.bankCode]||BANK_INFO.other;
-    return `<option value="${w.id}">${w.icon} ${w.name} (${baht(w.balance)})</option>`;
-  }).join('');
-  // Default: first wallet → second wallet
-  const w0 = store.wallets[0];
-  const w1 = store.wallets[1];
+  // Separate liquid wallets (can be source) from all wallets (destination)
+  const liquidWallets = store.wallets.filter(w=>(w.type||'cash')!=='savings');
+  const w0 = liquidWallets[0] || store.wallets[0];
   const bi0 = BANK_INFO[w0.bankCode]||BANK_INFO.other;
-  const bi1 = BANK_INFO[w1.bankCode]||BANK_INFO.other;
+  const preToWallet = preToId ? walletById(preToId) : null;
+  const defaultTo = preToWallet || (store.wallets.find(w=>w.id!==w0.id)) || store.wallets[1];
+  const bi1 = BANK_INFO[defaultTo.bankCode]||BANK_INFO.other;
+
   body.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="transfer-wallet-row">
@@ -3165,7 +3173,7 @@ function renderTransferBody() {
             <select id="tr-from" onchange="updateTransferIcons()"
               style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
               background:var(--surface);font-family:inherit;font-size:14px;color:var(--fg);">
-              ${optHtml}
+              ${liquidWallets.map(w=>`<option value="${w.id}" ${w.id===w0.id?'selected':''}>${w.icon} ${w.name} (${baht(w.balance)})</option>`).join('')}
             </select>
           </div>
         </div>
@@ -3177,15 +3185,29 @@ function renderTransferBody() {
         <div class="transfer-wallet-sel">
           <div style="width:36px;height:36px;border-radius:10px;background:${bi1.s};color:${bi1.c};
             display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0"
-            id="tr-to-icon">${w1.icon}</div>
+            id="tr-to-icon">${defaultTo.icon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:10px;font-weight:700;color:var(--fg-muted);margin-bottom:4px;letter-spacing:.06em">ถึง</div>
             <select id="tr-to" onchange="updateTransferIcons()"
               style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
               background:var(--surface);font-family:inherit;font-size:14px;color:var(--fg);">
-              ${store.wallets.map((w,i)=>`<option value="${w.id}" ${i===1?'selected':''}>${w.icon} ${w.name} (${baht(w.balance)})</option>`).join('')}
+              ${store.wallets.map(w=>`<option value="${w.id}" ${w.id===defaultTo.id?'selected':''}>${w.icon} ${w.name}${(w.type||'cash')==='credit'&&w.balance<0?' (ค้างชำระ '+baht(-w.balance)+')':' ('+baht(w.balance)+')'}</option>`).join('')}
             </select>
           </div>
+        </div>
+      </div>
+
+      <!-- Credit card payment panel — shown/hidden by updateTransferIcons -->
+      <div id="tr-cc-panel" style="display:none;background:var(--cc-s);border-radius:var(--rad-s);
+        padding:10px 12px;border:1.5px solid var(--cc-c)">
+        <div style="font-size:11px;font-weight:700;color:var(--cc-c);margin-bottom:6px">💳 ชำระบัตรเครดิต</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div id="tr-cc-owed" style="font-size:13px;color:var(--expense);font-family:'IBM Plex Mono',monospace;font-weight:700"></div>
+          <button onclick="fillFullPayment()" id="tr-full-btn"
+            style="padding:5px 12px;border:none;border-radius:6px;background:var(--cc-c);
+            color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">
+            ชำระเต็มจำนวน
+          </button>
         </div>
       </div>
 
@@ -3213,13 +3235,16 @@ function renderTransferBody() {
           background:var(--surface2);font-family:inherit;font-size:14px;color:var(--fg);box-sizing:border-box;">
       </div>
 
-      <button onclick="saveTransfer()" style="
+      <button id="tr-submit-btn" onclick="saveTransfer()" style="
         width:100%;padding:13px;border:none;border-radius:var(--rad);
         background:var(--accent);color:#fff;font-family:inherit;
         font-size:15px;font-weight:700;cursor:pointer;">
         🔄 โอนเงิน
       </button>
     </div>`;
+
+  // Apply credit card context if pre-selected
+  if (preToId) updateTransferIcons();
 }
 
 function updateTransferIcons() {
@@ -3236,6 +3261,37 @@ function updateTransferIcons() {
     const bt = BANK_INFO[wt.bankCode]||BANK_INFO.other;
     const el = document.getElementById('tr-to-icon');
     if (el) { el.textContent=wt.icon; el.style.background=bt.s; el.style.color=bt.c; }
+  }
+  // Credit card payment mode
+  const isCC = wt && (wt.type||'cash') === 'credit';
+  const ccPanel  = document.getElementById('tr-cc-panel');
+  const submitBtn= document.getElementById('tr-submit-btn');
+  const titleEl  = document.getElementById('transfer-overlay-title');
+  if (isCC) {
+    const owed = -wt.balance;
+    if (ccPanel) {
+      ccPanel.style.display = '';
+      const owedEl = document.getElementById('tr-cc-owed');
+      if (owedEl) owedEl.textContent = owed > 0 ? `ค้างชำระ ${baht(owed)}` : 'ไม่มียอดค้างชำระ';
+      const fullBtn = document.getElementById('tr-full-btn');
+      if (fullBtn) fullBtn.style.display = owed > 0 ? '' : 'none';
+    }
+    if (submitBtn) { submitBtn.textContent = '💳 ชำระบัตร'; submitBtn.style.background = 'var(--expense)'; }
+    if (titleEl)   titleEl.textContent = '💳 ชำระบัตรเครดิต';
+  } else {
+    if (ccPanel)   ccPanel.style.display = 'none';
+    if (submitBtn) { submitBtn.textContent = '🔄 โอนเงิน'; submitBtn.style.background = 'var(--accent)'; }
+    if (titleEl)   titleEl.textContent = '🔄 โอนเงินระหว่างกระเป๋า';
+  }
+}
+function fillFullPayment() {
+  const toId = document.getElementById('tr-to').value;
+  const wt = walletById(toId);
+  if (!wt || (wt.type||'cash') !== 'credit') return;
+  const owed = -wt.balance;
+  if (owed > 0) {
+    const inp = document.getElementById('tr-amount');
+    if (inp) { inp.value = owed.toFixed(2); inp.focus(); }
   }
 }
 
@@ -3255,13 +3311,15 @@ function saveTransfer() {
   const date = document.getElementById('tr-date').value||new Date().toISOString().slice(0,10);
   const wFrom = walletById(fromId);
   const wTo   = walletById(toId);
-  const label = desc || `โอน: ${wFrom.name} → ${wTo.name}`;
+  const isCCPayment = (wTo.type||'cash') === 'credit';
+  const cat = isCCPayment ? 'ชำระบัตรเครดิต' : 'โอนเงิน';
+  const label = desc || (isCCPayment ? `ชำระบัตร: ${wTo.name}` : `โอน: ${wFrom.name} → ${wTo.name}`);
   const now = Date.now();
 
   // Expense from source
-  store.txns.push({id:now,   date, type:'expense', amount, cat:'โอนเงิน', wallet:fromId, desc:label, method:'transfer'});
-  // Income to dest
-  store.txns.push({id:now+1, date, type:'income',  amount, cat:'โอนเงิน', wallet:toId,   desc:label, method:'transfer'});
+  store.txns.push({id:now,   date, type:'expense', amount, cat, wallet:fromId, desc:label, method:'transfer'});
+  // Income to dest (credit card: reduces debt)
+  store.txns.push({id:now+1, date, type:'income',  amount, cat, wallet:toId,   desc:label, method:'transfer'});
 
   wFrom.balance -= amount;
   wTo.balance   += amount;

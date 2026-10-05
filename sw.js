@@ -1,5 +1,5 @@
 // FinFlow Service Worker — Offline-first PWA
-const CACHE_NAME = 'finflow-v19';
+const CACHE_NAME = 'finflow-v20';
 const STATIC_ASSETS = [
   './',
   './index.html',
