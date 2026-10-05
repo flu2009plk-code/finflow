@@ -12,6 +12,8 @@
   <link rel="apple-touch-icon" href="./icons/icon-apple-touch.png">
   <title>FinFlow</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<title>FinFlow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 
 <style>
 /* Layout: single-column app shell, sticky topbar, scrollable body, fixed FAB, bottom-sheet popups */
@@ -1270,7 +1272,19 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
+
+// ── Firebase Cloud Sync (optional — gracefully disabled if SDK unavailable) ──
+const FB_CFG_KEY    = 'finflow_fb_cfg';
+const FB_FAMILY_KEY = 'finflow_fb_fam';
+const FB_TS_KEY     = 'finflow_fb_ts';
+let _fbReady = false;   // true once Firebase initialized
+let _fbAuth  = null;    // firebase.auth instance
+let _fbDb    = null;    // firebase.firestore instance
+let _fbUser  = null;    // current signed-in user
+let _fbFamId = null;    // family document ID (= invite code)
+let _fbUnsub = null;    // Firestore listener unsubscribe fn
+let _fbSaving = false;  // debounce guard
 const STORE = 'finflow_v1';
 
 const DEFAULT_WALLETS = [
@@ -1505,6 +1519,363 @@ function saveStore() {
     const snap = JSON.parse(JSON.stringify(store));
     _idbSet(STORE, snap).catch(() => {});
   }
+  // Firebase Cloud Sync (no-op if not configured/logged in)
+  if (_fbReady && _fbFamId && _fbUser) {
+    saveToCloud().catch(() => {});
+  }
+}
+
+function saveStoreLocalOnly() {
+  // Save to local storage only (used internally to avoid recursion)
+  try { localStorage.setItem(STORE, JSON.stringify(store)); } catch(e) {}
+  if (_idb) { const snap = JSON.parse(JSON.stringify(store)); _idbSet(STORE, snap).catch(()=>{}); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  FIREBASE CLOUD SYNC
+// ═══════════════════════════════════════════════════════
+function getFbCfg() {
+  try { return JSON.parse(localStorage.getItem(FB_CFG_KEY)||'null'); } catch(e) { return null; }
+}
+function setFbCfg(obj) {
+  try { localStorage.setItem(FB_CFG_KEY, JSON.stringify(obj)); } catch(e) {}
+}
+
+function _loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res;
+    s.onerror = () => rej(new Error('load fail'));
+    document.head.appendChild(s);
+  });
+}
+
+async function initFirebase() {
+  const cfg = getFbCfg();
+  if (!cfg || !cfg.apiKey) return; // no config — local mode
+  try {
+    const base = 'https://www.gstatic.com/firebasejs/9.23.0';
+    await _loadScript(`${base}/firebase-app-compat.js`);
+    await _loadScript(`${base}/firebase-auth-compat.js`);
+    await _loadScript(`${base}/firebase-firestore-compat.js`);
+    if (!window.firebase) return;
+    // Init only once
+    const apps = firebase.apps || [];
+    const fbApp = apps.length ? apps[0] : firebase.initializeApp(cfg);
+    _fbAuth = firebase.auth(fbApp);
+    _fbDb   = firebase.firestore(fbApp);
+    _fbReady = true;
+    // Listen to auth state
+    _fbAuth.onAuthStateChanged(async user => {
+      _fbUser = user;
+      if (user) {
+        _fbFamId = localStorage.getItem(FB_FAMILY_KEY) || null;
+        if (_fbFamId) {
+          await _loadFamilyNow();
+          _subscribeFamily();
+        }
+      } else {
+        if (_fbUnsub) { _fbUnsub(); _fbUnsub = null; }
+        _fbFamId = null;
+      }
+      // Refresh cloud section if settings open
+      const body = document.getElementById('export-body');
+      if (body && body.querySelector('#fb-cloud-section')) renderExportBody();
+    });
+  } catch(e) {
+    console.warn('[FinFlow] Firebase unavailable (local mode):', e.message);
+    _fbReady = false;
+  }
+}
+
+async function fbSignIn() {
+  if (!_fbAuth) return;
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _fbAuth.signInWithPopup(provider);
+  } catch(e) { showToast('❌ เข้าสู่ระบบไม่สำเร็จ'); }
+}
+
+async function fbSignOut() {
+  if (!_fbAuth) return;
+  if (_fbUnsub) { _fbUnsub(); _fbUnsub = null; }
+  localStorage.removeItem(FB_FAMILY_KEY);
+  _fbFamId = null;
+  await _fbAuth.signOut();
+  showToast('👋 ออกจากระบบแล้ว');
+  renderExportBody();
+}
+
+// Generate random invite code
+function _genCode() {
+  return Math.random().toString(36).substr(2,6).toUpperCase();
+}
+
+async function createFamily() {
+  if (!_fbDb || !_fbUser) return null;
+  const code = _genCode();
+  const member = {uid:_fbUser.uid, name:_fbUser.displayName||'ผู้ใช้', email:_fbUser.email||''};
+  await _fbDb.collection('families').doc(code).set({
+    store: JSON.parse(JSON.stringify(store)),
+    members: [member],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: _fbUser.uid,
+  });
+  _fbFamId = code;
+  localStorage.setItem(FB_FAMILY_KEY, code);
+  _subscribeFamily();
+  showToast('✅ สร้างครอบครัวแล้ว! รหัส: ' + code);
+  renderExportBody();
+  return code;
+}
+
+async function joinFamily(code) {
+  if (!_fbDb || !_fbUser || !code) return false;
+  code = code.trim().toUpperCase();
+  try {
+    const snap = await _fbDb.collection('families').doc(code).get();
+    if (!snap.exists) { showToast('❌ ไม่พบรหัส "' + code + '"'); return false; }
+    const data = snap.data();
+    // Add member if not already
+    const members = data.members || [];
+    if (!members.find(m => m.uid === _fbUser.uid)) {
+      members.push({uid:_fbUser.uid, name:_fbUser.displayName||'ผู้ใช้', email:_fbUser.email||''});
+      await snap.ref.update({ members });
+    }
+    _fbFamId = code;
+    localStorage.setItem(FB_FAMILY_KEY, code);
+    // Load cloud data into local store
+    if (data.store?.wallets) {
+      store = data.store;
+      saveStoreLocal();
+      ensureBudgets(); ensureRecurring(); ensureDebts(); ensureTags();
+      renderAll();
+    }
+    _subscribeFamily();
+    showToast('✅ เข้าร่วมครอบครัวแล้ว! รหัส: ' + code);
+    renderExportBody();
+    return true;
+  } catch(e) { showToast('❌ เกิดข้อผิดพลาด: ' + e.message); return false; }
+}
+
+async function leaveFamily() {
+  if (!_fbDb || !_fbUser || !_fbFamId) return;
+  if (!confirm('ออกจากครอบครัวนี้?\nข้อมูลในเครื่องยังคงอยู่ แต่จะไม่ซิงค์อีก')) return;
+  try {
+    const ref = _fbDb.collection('families').doc(_fbFamId);
+    const snap = await ref.get();
+    if (snap.exists) {
+      const members = (snap.data().members||[]).filter(m=>m.uid!==_fbUser.uid);
+      await ref.update({ members });
+    }
+  } catch(e) {}
+  if (_fbUnsub) { _fbUnsub(); _fbUnsub = null; }
+  localStorage.removeItem(FB_FAMILY_KEY);
+  _fbFamId = null;
+  showToast('👋 ออกจากครอบครัวแล้ว');
+  renderExportBody();
+}
+
+async function _loadFamilyNow() {
+  if (!_fbDb || !_fbFamId) return;
+  try {
+    const snap = await _fbDb.collection('families').doc(_fbFamId).get();
+    if (!snap.exists) { localStorage.removeItem(FB_FAMILY_KEY); _fbFamId=null; return; }
+    const data = snap.data();
+    const remoteTs = data.updatedAt?.toMillis() || 0;
+    const localTs  = parseInt(localStorage.getItem(FB_TS_KEY)||'0');
+    if (remoteTs > localTs && data.store?.wallets) {
+      store = data.store;
+      saveStoreLocal();
+      ensureBudgets(); ensureRecurring(); ensureDebts(); ensureTags();
+      renderAll();
+    }
+  } catch(e) {}
+}
+
+function _subscribeFamily() {
+  if (!_fbDb || !_fbFamId) return;
+  if (_fbUnsub) _fbUnsub();
+  _fbUnsub = _fbDb.collection('families').doc(_fbFamId).onSnapshot(snap => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    // Skip if we just wrote this change
+    if (data.updatedBy === _fbUser?.uid && _fbSaving) return;
+    const remoteTs = data.updatedAt?.toMillis() || 0;
+    const localTs  = parseInt(localStorage.getItem(FB_TS_KEY)||'0');
+    if (remoteTs > localTs && data.store?.wallets) {
+      store = data.store;
+      localStorage.setItem(FB_TS_KEY, String(remoteTs));
+      saveStoreLocal();
+      ensureBudgets(); ensureRecurring(); ensureDebts(); ensureTags();
+      renderAll();
+      showToast('🔄 ซิงค์ข้อมูลแล้ว');
+    }
+  }, () => {});
+}
+
+async function saveToCloud() {
+  if (!_fbDb || !_fbFamId || !_fbUser) return;
+  _fbSaving = true;
+  const ts = Date.now();
+  localStorage.setItem(FB_TS_KEY, String(ts));
+  try {
+    await _fbDb.collection('families').doc(_fbFamId).update({
+      store: JSON.parse(JSON.stringify(store)),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: _fbUser.uid,
+    });
+  } catch(e) {
+    // Doc may not exist yet (shouldn't happen but handle gracefully)
+  }
+  setTimeout(() => { _fbSaving = false; }, 1000);
+}
+
+// alias used internally within Firebase block
+const saveStoreLocal = () => saveStoreLocalOnly();
+
+// Render cloud sync section (embedded in export/settings body)
+function renderCloudSection() {
+  const isConfigured = !!getFbCfg()?.apiKey;
+  const isLoggedIn   = _fbReady && !!_fbUser;
+  const hasFam       = !!_fbFamId;
+  const members      = []; // will be loaded separately
+
+  if (!isConfigured) {
+    return `<div id="fb-cloud-section" style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;letter-spacing:.05em">☁️ Cloud Sync</div>
+      <div style="background:var(--surface2);border-radius:var(--rad-s);padding:12px;font-size:12px;color:var(--fg-muted);margin-bottom:10px;line-height:1.7">
+        เชื่อมต่อ Firebase เพื่อ<br>
+        ✅ ซิงค์ข้ามอุปกรณ์ · ✅ แชร์กับครอบครัว · ✅ สำรองข้อมูลออนไลน์<br><br>
+        <b style="color:var(--fg)">วิธีตั้งค่า:</b><br>
+        1. ไปที่ <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">console.firebase.google.com</a><br>
+        2. สร้าง Project → Add Web App → ก๊อป Config<br>
+        3. เปิด Authentication → Sign-in method → เปิด Google<br>
+        4. สร้าง Firestore Database (เลือก region asia-southeast1)<br>
+        5. วาง Config JSON ด้านล่างแล้วกด บันทึก
+      </div>
+      <textarea id="fb-cfg-input" rows="5" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+        background:var(--surface2);font-size:11px;font-family:'IBM Plex Mono',monospace;
+        color:var(--fg);box-sizing:border-box;resize:vertical"></textarea>
+      <button onclick="saveFbConfig()" style="margin-top:8px;width:100%;padding:11px;border:none;border-radius:var(--rad-s);
+        background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">
+        💾 บันทึก Firebase Config
+      </button>
+    </div>`;
+  }
+
+  if (!isLoggedIn) {
+    return `<div id="fb-cloud-section" style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;letter-spacing:.05em">☁️ Cloud Sync</div>
+      <div style="background:var(--accent-s);border-radius:var(--rad-s);padding:10px 12px;font-size:12px;color:var(--accent);margin-bottom:10px">
+        Firebase พร้อมใช้งาน — กรุณาเข้าสู่ระบบ
+      </div>
+      <button onclick="fbSignIn()" style="width:100%;padding:12px;border:none;border-radius:var(--rad-s);
+        background:#4285F4;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:8px">
+        🔑 เข้าสู่ระบบด้วย Google
+      </button>
+      <button onclick="clearFbConfig()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+        background:none;color:var(--fg-muted);font-size:12px;cursor:pointer;font-family:inherit">
+        ลบการตั้งค่า Firebase
+      </button>
+    </div>`;
+  }
+
+  // Logged in
+  const syncStatus = hasFam
+    ? `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--income)">
+        <span style="width:8px;height:8px;background:var(--income);border-radius:50%;display:inline-block"></span>
+        ซิงค์แบบ real-time — รหัสครอบครัว: <b>${_fbFamId}</b>
+       </div>`
+    : `<div style="font-size:12px;color:var(--fg-muted)">ยังไม่ได้เข้าร่วมครอบครัว</div>`;
+
+  return `<div id="fb-cloud-section" style="margin-bottom:16px">
+    <div style="font-size:12px;font-weight:700;color:var(--fg2);margin-bottom:8px;letter-spacing:.05em">☁️ Cloud Sync</div>
+    <div style="background:var(--surface2);border-radius:var(--rad-s);padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        ${_fbUser.photoURL?`<img src="${_fbUser.photoURL}" style="width:28px;height:28px;border-radius:50%">`:``}
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--fg)">${_fbUser.displayName||'ผู้ใช้'}</div>
+          <div style="font-size:11px;color:var(--fg-muted)">${_fbUser.email||''}</div>
+        </div>
+        <button onclick="fbSignOut()" style="margin-left:auto;padding:4px 10px;border:1px solid var(--border);
+          border-radius:6px;background:none;font-size:11px;color:var(--fg-muted);cursor:pointer">ออก</button>
+      </div>
+      ${syncStatus}
+    </div>
+    ${hasFam ? `
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div style="flex:1;background:var(--surface2);border-radius:var(--rad-s);padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--fg-muted);margin-bottom:4px">รหัสเชิญ</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent);letter-spacing:.1em">${_fbFamId}</div>
+        <div style="font-size:10px;color:var(--fg-muted)">แชร์ให้คู่สมรส/ครอบครัว</div>
+      </div>
+    </div>
+    <button onclick="leaveFamily()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:var(--rad-s);
+      background:none;color:var(--fg-muted);font-size:12px;cursor:pointer;font-family:inherit">
+      ออกจากครอบครัวนี้
+    </button>
+    ` : `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <button onclick="createFamily()" style="padding:12px 8px;border:none;border-radius:var(--rad-s);
+        background:var(--accent);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">
+        🏠 สร้างครอบครัว
+      </button>
+      <button onclick="openJoinFamily()" style="padding:12px 8px;border:1.5px solid var(--accent);border-radius:var(--rad-s);
+        background:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">
+        🔗 ใส่รหัสเชิญ
+      </button>
+    </div>
+    <div id="join-fam-row" style="display:none;gap:8px;margin-bottom:10px">
+      <input id="join-code-inp" type="text" maxlength="6" placeholder="รหัส 6 ตัว เช่น ABC123"
+        style="flex:1;padding:10px 12px;border:1.5px solid var(--accent);border-radius:var(--rad-s);
+        background:var(--surface2);font-family:'IBM Plex Mono',monospace;font-size:15px;
+        color:var(--fg);box-sizing:border-box;text-transform:uppercase;letter-spacing:.1em;width:100%">
+      <button onclick="doJoinFamily()" style="padding:10px 16px;border:none;border-radius:var(--rad-s);
+        background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;margin-top:6px;width:100%">
+        เข้าร่วม
+      </button>
+    </div>
+    `}
+  </div>`;
+}
+
+async function saveFbConfig() {
+  const raw = (document.getElementById('fb-cfg-input')?.value||'').trim();
+  if (!raw) return;
+  try {
+    const cfg = JSON.parse(raw);
+    if (!cfg.apiKey || !cfg.projectId) { showToast('❌ Config ไม่ถูกต้อง'); return; }
+    setFbCfg(cfg);
+    showToast('✅ บันทึก Config แล้ว กำลังเชื่อมต่อ...');
+    await initFirebase();
+    renderExportBody();
+  } catch(e) { showToast('❌ JSON ไม่ถูกต้อง — ตรวจสอบใหม่อีกครั้ง'); }
+}
+
+function clearFbConfig() {
+  if (!confirm('ลบการตั้งค่า Firebase?\nการซิงค์จะหยุดทำงาน แต่ข้อมูลในเครื่องยังอยู่')) return;
+  localStorage.removeItem(FB_CFG_KEY);
+  localStorage.removeItem(FB_FAMILY_KEY);
+  localStorage.removeItem(FB_TS_KEY);
+  if (_fbUnsub) { _fbUnsub(); _fbUnsub = null; }
+  _fbReady = false; _fbAuth = null; _fbDb = null; _fbUser = null; _fbFamId = null;
+  showToast('🗑️ ลบ Config แล้ว');
+  renderExportBody();
+}
+
+function openJoinFamily() {
+  const row = document.getElementById('join-fam-row');
+  if (row) { row.style.display = row.style.display==='none' ? 'flex' : 'none'; row.style.flexDirection='column'; }
+}
+
+async function doJoinFamily() {
+  const code = (document.getElementById('join-code-inp')?.value||'').trim().toUpperCase();
+  if (code.length < 3) { showToast('❌ ใส่รหัสครอบครัว'); return; }
+  await joinFamily(code);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2328,6 +2699,7 @@ document.getElementById('theme-btn').addEventListener('click',()=>{darkMode=!dar
   renderAll();
   initLockScreen(); // show PIN lock if enabled
   renderExChips();
+  initFirebase(); // optional cloud sync — gracefully no-ops if no config
   if (!SpeechRecognition) {
     document.getElementById('mic-status').textContent = 'เบราว์เซอร์นี้ไม่รองรับ Voice — ใช้การพิมพ์แทน';
     document.getElementById('mic-btn').classList.add('unsupported');
@@ -2824,6 +3196,9 @@ function renderExportBody() {
         </div>
       </div>
       <div style="font-size:11px;color:var(--fg-muted);margin-top:8px" id="backup-last-lbl"></div>
+    </div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      ${renderCloudSection()}
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:12px;font-weight:700;color:var(--expense);margin-bottom:8px;letter-spacing:.05em">⚠️ โซนอันตราย</div>
