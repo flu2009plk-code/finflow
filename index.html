@@ -78,9 +78,15 @@ body{
 .topbar{
   position:sticky;top:env(safe-area-inset-top,0px);z-index:30;
   background:var(--surface);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
-  padding:11px 16px;gap:8px;
+  display:flex;flex-direction:column;padding:8px 12px 0;gap:0;
 }
+.topbar-row1{display:flex;align-items:center;justify-content:space-between;padding-bottom:6px;}
+.topbar-row2{
+  display:flex;align-items:center;gap:4px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:8px;scrollbar-width:none;
+}
+.topbar-row2::-webkit-scrollbar{display:none;}
 .app-name{font-size:17px;font-weight:700;letter-spacing:-.4px;color:var(--accent);}
 .month-nav{display:flex;align-items:center;gap:2px;}
 .mnav-btn{
@@ -89,12 +95,12 @@ body{
   transition:background .12s;
 }
 .mnav-btn:hover{background:var(--border);}
-.month-lbl{font-size:13px;font-weight:600;color:var(--fg2);min-width:110px;text-align:center;}
+.month-lbl{font-size:13px;font-weight:600;color:var(--fg2);min-width:100px;text-align:center;}
 .theme-btn{
   background:none;border:1px solid var(--border);cursor:pointer;
-  color:var(--fg-muted);padding:5px 9px;font-size:13px;
+  color:var(--fg-muted);padding:5px 8px;font-size:13px;
   border-radius:var(--rad-s);transition:background .12s;
-  white-space:nowrap;
+  white-space:nowrap;flex-shrink:0;
 }
 .theme-btn:hover{background:var(--border);}
 
@@ -743,14 +749,18 @@ body{
 /* ── Wallet type summary bar ─────────────────────── */
 .wtype-summary{
   display:flex;gap:6px;margin-top:10px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:4px;scrollbar-width:none;
 }
+.wtype-summary::-webkit-scrollbar{display:none;}
 .wtype-sum-item{
-  flex:1;background:var(--surface);border:1px solid var(--border);
+  flex:0 0 auto;min-width:100px;
+  background:var(--surface);border:1px solid var(--border);
   border-radius:var(--rad-s);padding:9px 10px;
   display:flex;flex-direction:column;gap:3px;box-shadow:var(--sh);
 }
-.wtype-sum-label{font-size:9px;font-weight:700;color:var(--fg-muted);letter-spacing:.06em;text-transform:uppercase;}
-.wtype-sum-bal{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+.wtype-sum-label{font-size:9px;font-weight:700;color:var(--fg-muted);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wtype-sum-bal{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* ── Wallet groups (accordion) ───────────────────── */
 .wgroup{margin-bottom:8px;border-radius:var(--rad);overflow:hidden;box-shadow:var(--sh);}
@@ -832,19 +842,25 @@ body{
 
 <div id="app">
   <header class="topbar">
-    <span class="app-name">FinFlow</span><span id="app-version-chip" style="font-size:9px;padding:1px 6px;border-radius:6px;background:var(--accent-s);color:var(--accent);font-weight:700;margin-left:4px;vertical-align:middle;letter-spacing:.2px"></span>
-    <div class="month-nav">
-      <button class="mnav-btn" id="prev-month">&#8249;</button>
-      <span class="month-lbl" id="month-lbl"></span>
-      <button class="mnav-btn" id="next-month">&#8250;</button>
+    <div class="topbar-row1">
+      <div style="display:flex;align-items:center">
+        <span class="app-name">FinFlow</span><span id="app-version-chip" style="font-size:9px;padding:1px 6px;border-radius:6px;background:var(--accent-s);color:var(--accent);font-weight:700;margin-left:4px;letter-spacing:.2px"></span>
+      </div>
+      <div class="month-nav">
+        <button class="mnav-btn" id="prev-month">&#8249;</button>
+        <span class="month-lbl" id="month-lbl"></span>
+        <button class="mnav-btn" id="next-month">&#8250;</button>
+      </div>
+      <button class="theme-btn" id="theme-btn" style="padding:5px 7px">🌙</button>
     </div>
-    <button class="theme-btn" onclick="toggleSearch()" id="search-btn" title="ค้นหา" style="padding:5px 8px">🔍</button>
-    <button class="theme-btn" onclick="openBudget()" title="งบประมาณ" style="padding:5px 8px">💰</button>
-    <button class="theme-btn" onclick="openRecurring()" title="รายการประจำ" style="padding:5px 8px">🔁</button>
-    <button class="theme-btn" onclick="openDebt()" title="บัญชีหนี้" style="padding:5px 8px">📒</button>
-    <button class="theme-btn" onclick="openExport()" title="ส่งออกข้อมูล" style="padding:5px 8px">📤</button>
-    <button class="theme-btn" onclick="openPinSettings()" title="ตั้งค่า PIN" style="padding:5px 8px">🔐</button>
-    <button class="theme-btn" id="theme-btn">🌙 Dark</button>
+    <div class="topbar-row2">
+      <button class="theme-btn" onclick="toggleSearch()" id="search-btn" title="ค้นหา">🔍 ค้นหา</button>
+      <button class="theme-btn" onclick="openBudget()" title="งบประมาณ">💰 งบประมาณ</button>
+      <button class="theme-btn" onclick="openRecurring()" title="รายการประจำ">🔁 ประจำ</button>
+      <button class="theme-btn" onclick="openDebt()" title="บัญชีหนี้">📒 หนี้</button>
+      <button class="theme-btn" onclick="openExport()" title="ส่งออกข้อมูล">📤 ส่งออก</button>
+      <button class="theme-btn" onclick="openPinSettings()" title="ตั้งค่า PIN">🔐 PIN</button>
+    </div>
   </header>
 
   <!-- Search bar (hidden by default) -->
@@ -1260,7 +1276,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 
 // ── Firebase Cloud Sync (optional — gracefully disabled if SDK unavailable) ──
 const FB_CFG_KEY    = 'finflow_fb_cfg';
@@ -2665,7 +2681,7 @@ let darkMode=false;
 try{darkMode=localStorage.getItem('finflow_theme')==='dark';}catch(e){}
 function applyTheme(){
   document.documentElement.setAttribute('data-theme',darkMode?'dark':'light');
-  document.getElementById('theme-btn').textContent=darkMode?'☀️ Light':'🌙 Dark';
+  document.getElementById('theme-btn').textContent=darkMode?'☀️':'🌙';
   try{localStorage.setItem('finflow_theme',darkMode?'dark':'light');}catch(e){}
 }
 document.getElementById('theme-btn').addEventListener('click',()=>{darkMode=!darkMode;applyTheme();});
