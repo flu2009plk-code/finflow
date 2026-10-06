@@ -1,17 +1,3 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="FinFlow">
-  <meta name="theme-color" content="#4F46E5">
-  <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" href="./icons/icon-apple-touch.png">
-  <title>FinFlow</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <title>FinFlow</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 
@@ -192,15 +178,17 @@ body{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--rad);padding:13px 11px;cursor:pointer;
   box-shadow:var(--sh);transition:transform .15s,box-shadow .15s;
+  min-width:0;overflow:hidden;
 }
 .wcard:hover{transform:translateY(-2px);box-shadow:var(--sh-lg);}
 .wcard:active{transform:translateY(0);}
 .wcard-icon{
   width:34px;height:34px;border-radius:9px;
   display:flex;align-items:center;justify-content:center;
-  font-size:17px;margin-bottom:8px;
+  font-size:17px;margin-bottom:8px;flex-shrink:0;
 }
-.wcard-name{font-size:11px;font-weight:500;color:var(--fg-muted);margin-bottom:3px;}
+.wcard-name{font-size:11px;font-weight:500;color:var(--fg-muted);margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .wcard-bal{
   font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;
   color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -790,7 +778,7 @@ body{
   border:1px solid var(--border);border-top:none;
   border-radius:0 0 var(--rad) var(--rad);
 }
-.wgroup-cards.open{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px;}
+.wgroup-cards.open{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px;overflow:hidden;}
 .wgroup-empty{padding:14px;text-align:center;font-size:12px;color:var(--fg-muted);}
 
 /* ── Transfer overlay ────────────────────────────── */
@@ -1272,7 +1260,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v21';
+const APP_VERSION = 'v22';
 
 // ── Firebase Cloud Sync (optional — gracefully disabled if SDK unavailable) ──
 const FB_CFG_KEY    = 'finflow_fb_cfg';
@@ -5178,17 +5166,3 @@ function markDebtPaid(id) {
   if (d) { d.paid = true; saveStore(); renderDebtBody(); showToast('✅ บันทึกว่าชำระแล้ว'); }
 }
 </script>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(r => console.log('SW registered:', r.scope))
-          .catch(e => console.error('SW error:', e));
-      });
-    }
-  </script>
-</head>
-<body>
-</body>
-</html>
