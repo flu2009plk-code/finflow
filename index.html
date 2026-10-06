@@ -1276,7 +1276,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 
 // ── Firebase Cloud Sync (optional — gracefully disabled if SDK unavailable) ──
 const FB_CFG_KEY    = 'finflow_fb_cfg';
@@ -1383,6 +1383,7 @@ const BANK_TYPE_LIST = {
 
 const TH_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
   'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const TH_DAYS_SHORT = ['อา','จ','อ','พ','พฤ','ศ','ส'];
 
 // ═══════════════════════════════════════════════════════
@@ -1419,7 +1420,7 @@ function walletBankInfo(w) {
 }
 function fmtDate(ds) {
   const d = new Date(ds + 'T00:00:00');
-  return `${d.getDate()} ${TH_MONTHS[d.getMonth()].substring(0,3)} ${d.getFullYear()+543}`;
+  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()+543}`;
 }
 function totalBalance() { return store.wallets.reduce((s,w) => s+w.balance, 0); }
 function monthTxns(y, m) {
@@ -3953,7 +3954,7 @@ function renderTrendChart() {
     let y = viewYear, m = viewMonth - i;
     if (m < 0) { m += 12; y -= 1; }
     const sums = monthSums(y, m);
-    const abbr = TH_MONTHS[m].substring(0, 3);
+    const abbr = THAI_MONTHS_SHORT[m];
     months.push({ y, m, label: abbr, income: sums.income, expense: sums.expense });
   }
 
@@ -4122,7 +4123,6 @@ function renderBudgetAlerts() {
 // ═══════════════════════════════════════════════════════
 //  V18: UPCOMING RECURRING ALERTS
 // ═══════════════════════════════════════════════════════
-const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
 function renderUpcomingAlerts() {
   const sec  = document.getElementById('upcoming-alerts-section');
