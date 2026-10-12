@@ -2486,7 +2486,7 @@ function renderTxList() {
   const sortedKeys = Object.keys(groups).sort((a,b) => b.localeCompare(a));
 
   list.innerHTML = sortedKeys.map(key => {
-    const grpTxns = groups[key].sort((a,b) => b.id - a.id);
+    const grpTxns = groups[key].sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
     const inc = grpTxns.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
     const exp = grpTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
     const [y, m] = key.split('-').map(Number);
