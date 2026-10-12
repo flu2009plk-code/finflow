@@ -241,6 +241,37 @@ body{
 .tx-amt.exp{color:var(--expense);}
 .tx-date-sm{font-size:11px;color:var(--fg-muted);margin-top:1px;}
 
+/* ── Transaction Month Group ─────────────────────── */
+.txm-group{display:flex;flex-direction:column;gap:0;}
+.txm-header{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rad);box-shadow:var(--sh);
+  transition:background .1s;user-select:none;
+}
+.txm-header:hover{background:var(--surface2);}
+.txm-chevron{
+  font-size:11px;color:var(--fg-muted);margin-left:auto;
+  transition:transform .2s;flex-shrink:0;
+}
+.txm-header.open .txm-chevron{transform:rotate(90deg);}
+.txm-label{font-size:13px;font-weight:700;color:var(--fg);flex-shrink:0;}
+.txm-summary{
+  display:flex;gap:8px;flex:1;min-width:0;
+  justify-content:flex-end;align-items:center;flex-wrap:wrap;
+}
+.txm-inc{font-size:12px;font-weight:600;color:var(--income);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+.txm-exp{font-size:12px;font-weight:600;color:var(--expense);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+.txm-count{font-size:10px;color:var(--fg-muted);white-space:nowrap;}
+.txm-cards{
+  display:flex;flex-direction:column;gap:6px;
+  margin-top:6px;
+  overflow:hidden;max-height:0;
+  transition:max-height .25s ease, margin-top .2s;
+}
+.txm-cards.open{max-height:10000px;margin-top:6px;}
+
 /* ── FAB ─────────────────────────────────────────── */
 .fab{
   position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));
@@ -1276,7 +1307,7 @@ body{
 // ═══════════════════════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════════════════════
-const APP_VERSION = 'v24';
+const APP_VERSION = 'v25';
 
 // ── Firebase Cloud Sync (optional — gracefully disabled if SDK unavailable) ──
 const FB_CFG_KEY    = 'finflow_fb_cfg';
@@ -1396,6 +1427,7 @@ let formCat = '';
 let formWallet = '';
 let voiceParsed = null;  // last parsed voice result
 let searchQuery = '';    // V10: search filter
+let _txMonthOpen = {};  // V25: which month groups are expanded (all collapsed by default)
 
 // ═══════════════════════════════════════════════════════
 //  HELPERS
@@ -2374,10 +2406,55 @@ function renderChart() {
   svg.innerHTML = p;
 }
 
+function txCardHtml(tx) {
+  const w=walletById(tx.wallet);
+  const wc=w?walletColor(w):{c:'var(--fg-muted)',s:'var(--surface2)'};
+  const isInc=tx.type==='income';
+  const icon=CAT_ICON[tx.cat]||'📝';
+  const icoBg=isInc?'var(--income-s)':'var(--expense-s)';
+  const icoC=isInc?'var(--income)':'var(--expense)';
+  const tagHtml=(tx.tags&&tx.tags.length)?
+    `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
+      ${tx.tags.map(t=>`<span onclick="event.stopPropagation();filterByTag('${t}')"
+        style="cursor:pointer;font-size:10px;padding:1px 7px;border-radius:10px;
+        background:var(--accent-s);color:var(--accent);line-height:1.6">#${t}</span>`).join('')}
+    </div>` : '';
+  return `<div class="txcard" onclick="openTxDetail(${tx.id})">
+    <div class="tx-ico" style="background:${icoBg};color:${icoC}">${icon}</div>
+    <div class="tx-info">
+      <div class="tx-cat">${tx.cat}</div>
+      <div class="tx-meta">
+        ${w?`<span class="wbadge" style="background:${wc.s};color:${wc.c}">${w.name}</span>`:''}
+        <span class="method-badge">${METHOD_LABEL[tx.method]||'✏️'}</span>
+      </div>
+      ${tagHtml}
+    </div>
+    <div class="tx-right">
+      <div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${baht(tx.amount)}</div>
+      <div class="tx-date-sm">${fmtDate(tx.date)}</div>
+    </div>
+  </div>`;
+}
+
+function toggleTxMonth(key) {
+  _txMonthOpen[key] = !_txMonthOpen[key];
+  const header = document.querySelector(`.txm-header[data-key="${key}"]`);
+  const cards  = document.querySelector(`.txm-cards[data-key="${key}"]`);
+  if (!header || !cards) return;
+  if (_txMonthOpen[key]) {
+    header.classList.add('open');
+    cards.classList.add('open');
+  } else {
+    header.classList.remove('open');
+    cards.classList.remove('open');
+  }
+}
+
 function renderTxList() {
   let txns;
   const title = document.getElementById('txlist-title');
-  if (searchQuery) {
+  const isSearch = !!searchQuery;
+  if (isSearch) {
     const q = searchQuery.toLowerCase();
     const tagQ = q.startsWith('#') ? q.slice(1) : q;
     txns = store.txns.filter(tx =>
@@ -2395,35 +2472,40 @@ function renderTxList() {
   document.getElementById('tx-count').textContent = txns.length+' รายการ';
   if (!txns.length) {
     list.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--fg-muted);font-size:13px">
-      ${searchQuery ? 'ไม่พบรายการที่ตรงกัน' : 'ยังไม่มีรายการในเดือนนี้<br>กด <strong>＋</strong> เพื่อเพิ่มรายการแรก'}</div>`;
+      ${isSearch ? 'ไม่พบรายการที่ตรงกัน' : 'ยังไม่มีรายการในเดือนนี้<br>กด <strong>＋</strong> เพื่อเพิ่มรายการแรก'}</div>`;
     return;
   }
-  list.innerHTML = txns.map(tx => {
-    const w=walletById(tx.wallet);
-    const wc=w?walletColor(w):{c:'var(--fg-muted)',s:'var(--surface2)'};
-    const isInc=tx.type==='income';
-    const icon=CAT_ICON[tx.cat]||'📝';
-    const icoBg=isInc?'var(--income-s)':'var(--expense-s)';
-    const icoC=isInc?'var(--income)':'var(--expense)';
-    const tagHtml=(tx.tags&&tx.tags.length)?
-      `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">
-        ${tx.tags.map(t=>`<span onclick="event.stopPropagation();filterByTag('${t}')"
-          style="cursor:pointer;font-size:10px;padding:1px 7px;border-radius:10px;
-          background:var(--accent-s);color:var(--accent);line-height:1.6">#${t}</span>`).join('')}
-      </div>` : '';
-    return `<div class="txcard" onclick="openTxDetail(${tx.id})">
-      <div class="tx-ico" style="background:${icoBg};color:${icoC}">${icon}</div>
-      <div class="tx-info">
-        <div class="tx-cat">${tx.cat}</div>
-        <div class="tx-meta">
-          ${w?`<span class="wbadge" style="background:${wc.s};color:${wc.c}">${w.name}</span>`:''}
-          <span class="method-badge">${METHOD_LABEL[tx.method]||'✏️'}</span>
+
+  // Group by year-month key (YYYY-MM), sorted newest first
+  const groups = {};
+  txns.forEach(tx => {
+    const key = tx.date ? tx.date.slice(0,7) : 'unknown';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  });
+  const sortedKeys = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+
+  list.innerHTML = sortedKeys.map(key => {
+    const grpTxns = groups[key].sort((a,b) => b.id - a.id);
+    const inc = grpTxns.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const exp = grpTxns.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const [y, m] = key.split('-').map(Number);
+    const thYear = y + 543;
+    const monthLabel = key === 'unknown' ? 'ไม่ระบุ' :
+      `${THAI_MONTHS_SHORT[m-1]} ${thYear}`;
+    const isOpen = !!_txMonthOpen[key];
+    return `<div class="txm-group">
+      <div class="txm-header${isOpen?' open':''}" data-key="${key}" onclick="toggleTxMonth('${key}')">
+        <span class="txm-label">${monthLabel}</span>
+        <div class="txm-summary">
+          ${inc>0?`<span class="txm-inc">+${baht(inc)}</span>`:''}
+          ${exp>0?`<span class="txm-exp">−${baht(exp)}</span>`:''}
+          <span class="txm-count">${grpTxns.length} รายการ</span>
         </div>
-        ${tagHtml}
+        <span class="txm-chevron">▶</span>
       </div>
-      <div class="tx-right">
-        <div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${baht(tx.amount)}</div>
-        <div class="tx-date-sm">${fmtDate(tx.date)}</div>
+      <div class="txm-cards${isOpen?' open':''}" data-key="${key}">
+        ${grpTxns.map(tx => txCardHtml(tx)).join('')}
       </div>
     </div>`;
   }).join('');
@@ -2672,10 +2754,10 @@ document.getElementById('submit-btn').addEventListener('click', ()=>{
 //  MONTH NAV & THEME
 // ═══════════════════════════════════════════════════════
 document.getElementById('prev-month').addEventListener('click', ()=>{
-  viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} renderAll();
+  viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} _txMonthOpen={}; renderAll();
 });
 document.getElementById('next-month').addEventListener('click', ()=>{
-  viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} renderAll();
+  viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} _txMonthOpen={}; renderAll();
 });
 
 let darkMode=false;
@@ -3932,6 +4014,7 @@ function toggleSearch() {
   } else {
     searchQuery = '';
     inp.value = '';
+    _txMonthOpen = {};
     renderTxList();
   }
 }
